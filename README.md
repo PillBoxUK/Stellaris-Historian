@@ -6,34 +6,32 @@ It is designed to turn a campaign into a living historical archive rather than j
 
 ## Current version
 
-### v0.0.50.4 — First Contact Adjective Inflection & Diagnostic Polish Hotfix
+### v0.0.51 — Console Completion Banner & Workflow Clarity
 
-The current development line expands the original historian into structured Politics/Diplomacy and First Contact history. v0.0.50.4 is a narrowly scoped follow-up to the live v0.0.50.3 Commonwealth test: the generated-name structure was finally decoded correctly, but Stellaris' adjective suffix grammar still needed to turn roots such as `Hazar` into the in-game adjective `Hazaran`.
+v0.0.51 is a small workflow-quality release built on the tested v0.0.50.4 First Contact line. It makes long manual Historian operations unmistakably finish in the command window, so a completed Review, Update or Construct run no longer looks as though it may still be working.
 
-### What changed in v0.0.50.4
+### What changed in v0.0.51
 
-- Applies Stellaris' installed `adj_NN*` adjective suffix localisation rules inside `%ADJECTIVE%` generated empire names instead of treating the saved base noun as the final adjective.
-- Fixes the live contact-91 result from `Stellar Hazar Council` to the expected generated form `Stellar Hazaran Council` when the installed Stellaris localisation contains the matching `r -> *ran` adjective rule.
-- Mirrors Stellaris' one-at-a-time generated-name variable substitution and removes only unresolved numeric continuation placeholders after normal substitutions.
-- Restores the First Contact diagnostic owner label from the selected campaign identity when the contact owner is the player country, preventing `Owner: Country 0` from replacing `Owner: Commonwealth of Man`.
-- Retains v0.0.50.3 technical-name rejection, `NAME_*` cleanup, nested `%ADJ%` / `%ADJECTIVE%` rendering, later candidate scanning and reciprocal First Contact completion detection.
-- Keeps accepted/rejected candidate diagnostics so generated-name decisions remain auditable.
-- No SQLite schema change, parsed-cache version bump, archive rewrite or full cache rebuild is required.
+- Adds a large final `ALL UPDATES ARE COMPLETED` console banner after a successful manual **Update History**, **Review Campaign** or **Construct Campaign** operation has genuinely finished.
+- Keeps the banner until the next console activity naturally scrolls it away; the command window itself remains open as before.
+- Prints `PROCESS COMPLETED WITH ERRORS` instead when the active manual workflow logged one or more errors.
+- Tracks Review/Construct aborts and journal-refresh failures so failed operations do not receive a success banner.
+- Deliberately suppresses completion banners for automatic **Live History** cycles, preventing repetitive banner spam while playing.
+- Leaves campaign data, SQLite schema, processed flags, archived saves and parsed-cache component versions unchanged.
 
-### Code areas changed in v0.0.50.4
+### Code areas changed in v0.0.51
 
-- `historian/domains/politics/first_contact_history.py` — Stellaris `adj_NN*` suffix rendering, generated-name placeholder semantics, player-owner diagnostic restoration and v0.0.50.4 diagnostics.
-- `historian/domains/politics/first_contact_journal.py` — First Contact Journal description updated to reflect adjective-grammar rendering.
-- `migrate_v0_0_50_4.py` — one-time release metadata migration and README/source validation.
-- `start.bat` — v0.0.50.4 startup banner and migration hook.
-- `README.md` — current-version notes, code-change details and development progress updated for v0.0.50.4.
-- `docs/CHANGELOG.md` and `historian_manifest.json` — updated automatically by the migration with v0.0.50.4 release metadata.
+- `historian/console.py` — manual-operation state tracking, Live History suppression and atomic success/error completion banners.
+- `migrate_v0_0_51.py` — one-time version/metadata migration and source validation.
+- `start.bat` — v0.0.51 startup banner and migration hook.
+- `README.md`, `docs/CHANGELOG.md` and `historian_manifest.json` — updated by the migration with v0.0.51 release metadata.
 
 ## Recent development progress
 
 | Version | Main change | Status |
 | --- | --- | --- |
-| **v0.0.50.4** | Stellaris adjective inflection for generated First Contact names; owner diagnostic polish | Current development version |
+| **v0.0.51** | Unmistakable manual workflow completion/error banner in the CMD window | Current development version |
+| **v0.0.50.4** | Stellaris adjective inflection for generated First Contact names; owner diagnostic polish | Tested and retained |
 | **v0.0.50.3** | Nested generated-name grammar, technical-key filtering and candidate diagnostics | Superseded by v0.0.50.4 |
 | **v0.0.50.2** | Followed First Contact country IDs into later raw/diplomatic state | Superseded |
 | **v0.0.50.1** | Added reciprocal counterpart → player completion detection | Retained |
@@ -140,7 +138,7 @@ Then restart Stellaris Historian when an update includes application code, migra
 
 Historian uses small versioned migrations for changes that need to update release metadata or local application state. Migration logs are written under `logs` and migration markers are stored under `data`.
 
-The v0.0.50.x First Contact work does **not** change the SQLite schema or parsed-cache component version, so no full cache rebuild is required for v0.0.50.4.
+v0.0.51 changes console workflow presentation only. It does **not** change the SQLite schema or parsed-cache component versions, so no full cache rebuild is required.
 
 ## Data and privacy
 
@@ -152,7 +150,7 @@ Your personal `config.json`, Stellaris save files, campaign archives, logs, data
 
 Stellaris Historian is under active development. The codebase is being expanded in small, testable stages, with live campaign diagnostics used to validate evidence rules before features are promoted into public historical narrative.
 
-Current development priorities include final validation of generated First Contact identity resolution, richer combat/war presentation, and continuing to turn retained Stellaris save evidence into a reliable long-form campaign history.
+Current development priorities include clearer workflow/status feedback, richer combat/war presentation, and continuing to turn retained Stellaris save evidence into a reliable long-form campaign history.
 
 ## Known limitations
 

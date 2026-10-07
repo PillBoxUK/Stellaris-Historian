@@ -1,7 +1,7 @@
 {
   "application": "Stellaris Historian",
-  "version": "0.0.50.4",
-  "architecture": "modular-foundation-29-first-contact-adjective-inflection",
+  "version": "0.0.51",
+  "architecture": "modular-foundation-30-console-completion-banner",
   "managed_roots": [
     "historian",
     "static",
@@ -251,5 +251,18 @@
     "journal_section": "First Contact",
     "name_resolution": "Render nested %ADJ%/%ADJECTIVE% grammar with installed adj_NN* adjective suffix rules; reject technical identifiers; retain candidate audit data.",
     "high_dynamic_country_ids": "Allowed in First Contact only when the contact record directly identifies the country and its resolved name passes pseudo-actor filtering; generic Politics filter is unchanged."
+  },
+  "console_workflow": {
+    "status": "manual-operation-completion-banner",
+    "success_banner": "ALL UPDATES ARE COMPLETED",
+    "error_banner": "PROCESS COMPLETED WITH ERRORS",
+    "manual_operations": [
+      "Update History",
+      "Review Campaign",
+      "Construct Campaign"
+    ],
+    "live_history_banner_suppressed": true,
+    "cache_version_change": false,
+    "database_schema_change": false
   }
 }

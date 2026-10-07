@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.0.51
+- Adds an unmistakable final `ALL UPDATES ARE COMPLETED` banner after successful manual Update History, Review Campaign and Construct Campaign workflows.
+- Prints `PROCESS COMPLETED WITH ERRORS` when the active manual workflow logged errors, including Review/Construct refresh failures.
+- Tracks manual workflow boundaries inside the console logger so the banner appears only after the operation's final journal/refresh step.
+- Suppresses completion banners for automatic Live History cycles to avoid repetitive console spam during normal play.
+- No SQLite schema, parsed-cache, archived-save or processed-flag changes.
+
 ## v0.0.50.4
 - Applies installed Stellaris `adj_NN*` adjective suffix grammar inside generated `%ADJECTIVE%` First Contact country names.
 - Fixes the live contact-91 generated form from `Stellar Hazar Council` to `Stellar Hazaran Council` when the installed `r -> *ran` rule is present.
