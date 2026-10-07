@@ -24,3 +24,5 @@ This patch is intentionally presentation-focused before the next combat-correlat
 6. In Scribes View, use **Export PDF** for the book-style PDF.
 
 **Restart required: YES.**
+
+GitHub repository initialized.
