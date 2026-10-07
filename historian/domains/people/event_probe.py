@@ -247,6 +247,7 @@ def _load_leader_snapshots(db: Database, campaign_id: int) -> tuple[list, list[L
             _science_snapshot,
             _combat_snapshot,
             _technology_snapshot,
+            _politics_snapshot,
             _cache_status,
         ) = load_or_parse_snapshot(
             archive_path=Path(row["archive_path"]),

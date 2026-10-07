@@ -51,6 +51,12 @@ from .domains.technology import (
     technology_evidence_summary,
     write_technology_diagnostic,
 )
+from .domains.politics import (
+    derive_full_politics_history,
+    politics_transition_data,
+    write_politics_database_diagnostic,
+    write_politics_history_diagnostic,
+)
 
 
 def _diagnostics_dir(archive_dir: Path) -> Path:
@@ -173,6 +179,17 @@ def _cache_summary(
 
 def process_unprocessed(db: Database, campaign_id: int) -> dict:
     started = time.perf_counter()
+
+    # v0.0.47 could commit the normal history row but fail before setting the
+    # snapshot processed flag if the new Politics/Diplomacy stage raised. Repair
+    # those durable rows before deciding what actually still needs processing.
+    recovered = db.reconcile_processed_snapshots(campaign_id)
+    if recovered:
+        warning(
+            f"UPDATE HISTORY - recovered {recovered} already-written snapshot(s) "
+            "from durable SQL history; they will not be replayed."
+        )
+
     snapshots = db.unprocessed_snapshots(campaign_id)
     campaign, source_save, cache_dir = _campaign_context(db, campaign_id)
     campaign_name = campaign["empire_name"]
@@ -181,6 +198,7 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
 
     processed = 0
     errors: list[str] = []
+    politics_warnings: list[str] = []
     cache = _cache_counter()
     parsed_in_run: dict[int, tuple] = {}
 
@@ -201,6 +219,7 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
                 current_science,
                 current_combat,
                 current_technology,
+                current_politics,
                 current_cache_status,
             ) = load_or_parse_snapshot(
                 archive_path=Path(snapshot["archive_path"]),
@@ -218,6 +237,7 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
                 current_science,
                 current_combat,
                 current_technology,
+                current_politics,
             )
             _record_cache_status(
                 cache,
@@ -240,6 +260,7 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
             previous_science = None
             previous_combat = None
             previous_technology = None
+            previous_politics = None
 
             if previous_row is not None:
                 previous_id = int(
@@ -255,6 +276,7 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
                         previous_science,
                         previous_combat,
                         previous_technology,
+                        previous_politics,
                     ) = parsed_in_run[
                         previous_id
                     ]
@@ -267,6 +289,7 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
                         previous_science,
                         previous_combat,
                         previous_technology,
+                        previous_politics,
                         previous_cache_status,
                     ) = load_or_parse_snapshot(
                         archive_path=Path(
@@ -286,6 +309,7 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
                         previous_science,
                         previous_combat,
                         previous_technology,
+                        previous_politics,
                     )
 
                     _record_cache_status(
@@ -311,6 +335,18 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
                 baseline=(snapshot["kind"] == "start"),
             )
 
+            politics_delta = None
+            if current_politics is not None:
+                politics_delta = politics_transition_data(
+                    previous_politics,
+                    current_politics,
+                    baseline=(snapshot["kind"] == "start"),
+                )
+            else:
+                politics_warnings.append(
+                    f"{snapshot['archive_filename']}: Politics/Diplomacy evidence could not be parsed; core history was retained."
+                )
+
             activity(
                 "         "
                 f"CACHE {current_cache_status.upper()} | "
@@ -327,6 +363,8 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
                 f"Ship combat {len(current_combat.ship_activity)} | "
                 f"Starbase combat {len(current_combat.starbase_activity)} | "
                 f"Techs {len(current_technology.technologies)} | "
+                f"Relations {len(current_politics.relations) if current_politics is not None else 0} | "
+                f"Traditions {len(current_politics.traditions) if current_politics is not None else 0} | "
                 f"Queued builds {len(current_state.build_orders)}"
             )
 
@@ -359,10 +397,26 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
                 world_delta,
             )
 
+            # Core Historian progress is durable independently of the
+            # additive Politics/Diplomacy domain.  Never make an already-written
+            # snapshot replay from the start because a new evidence domain fails.
             db.mark_processed(
                 snapshot_id
             )
             processed += 1
+
+            if politics_delta is not None:
+                try:
+                    db.apply_politics_delta(
+                        campaign_id,
+                        politics_delta,
+                    )
+                except Exception as exc:
+                    message = (
+                        f"{snapshot['archive_filename']}: Politics/Diplomacy persistence warning: {exc}"
+                    )
+                    politics_warnings.append(message)
+                    error(f"POLITICS / DIPLOMACY - {message}")
 
         except Exception as exc:
             message = f"{snapshot['archive_filename']}: {exc}"
@@ -386,9 +440,27 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
     except Exception as exc:
         error(f"NOTIFICATION-DERIVED LEADER DEATHS - {exc}")
 
+    try:
+        politics_live_debug = write_politics_database_diagnostic(
+            db,
+            campaign_id,
+        )
+        activity(
+            "Politics / diplomacy structured history updated - "
+            f"diagnostics\\{politics_live_debug.name}"
+        )
+    except Exception as exc:
+        error(f"POLITICS / DIPLOMACY HISTORY DIAGNOSTIC - {exc}")
+
     remaining = db.unprocessed_count(
         campaign_id
     )
+
+    try:
+        db.checkpoint()
+        activity("SQLite WAL checkpoint complete - durable progress flushed to historian.db.")
+    except Exception as exc:
+        warning(f"SQLITE CHECKPOINT - {exc}")
 
     activity(
         f"UPDATE HISTORY COMPLETE - {processed}/{total} processed - "
@@ -398,7 +470,9 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
 
     return {
         "processed": processed,
+        "recovered": recovered,
         "errors": errors,
+        "politics_warnings": politics_warnings,
         "remaining": remaining,
         "cache_hits": cache["hit"],
         "cache_extends": cache["extend"],
@@ -421,6 +495,7 @@ def review_campaign(db: Database, campaign_id: int) -> dict:
     science_snapshots = []
     combat_snapshots = []
     technology_snapshots = []
+    politics_snapshots = []
     errors: list[str] = []
     cache = _cache_counter()
 
@@ -439,6 +514,7 @@ def review_campaign(db: Database, campaign_id: int) -> dict:
                 science_snapshot,
                 combat_snapshot,
                 technology_snapshot,
+                politics_snapshot,
                 cache_status,
             ) = load_or_parse_snapshot(
                 archive_path=Path(snapshot["archive_path"]),
@@ -478,6 +554,10 @@ def review_campaign(db: Database, campaign_id: int) -> dict:
             technology_snapshots.append(
                 technology_snapshot
             )
+            if politics_snapshot is not None:
+                politics_snapshots.append(
+                    politics_snapshot
+                )
 
             activity(
                 "         "
@@ -495,6 +575,8 @@ def review_campaign(db: Database, campaign_id: int) -> dict:
                 f"Ship combat {len(combat_snapshot.ship_activity)} | "
                 f"Starbase combat {len(combat_snapshot.starbase_activity)} | "
                 f"Techs {len(technology_snapshot.technologies)} | "
+                f"Relations {len(politics_snapshot.relations) if politics_snapshot is not None else 0} | "
+                f"Traditions {len(politics_snapshot.traditions) if politics_snapshot is not None else 0} | "
                 f"Queued builds {len(parsed_snapshot.build_orders)}"
             )
 
@@ -550,6 +632,9 @@ def review_campaign(db: Database, campaign_id: int) -> dict:
     technology_summary = technology_evidence_summary(
         technology_snapshots
     )
+    politics_derived = derive_full_politics_history(
+        politics_snapshots
+    )
     correlated_engagements = derive_correlated_engagements(
         ship_fleet_snapshots,
         combat_snapshots,
@@ -578,6 +663,7 @@ def review_campaign(db: Database, campaign_id: int) -> dict:
         direct_combat_episodes=direct_combat_episodes,
         combat_episodes=combat_episodes,
         technology_snapshots=technology_snapshots,
+        politics_events=politics_derived["events"],
     )
 
     activity(
@@ -629,6 +715,12 @@ def review_campaign(db: Database, campaign_id: int) -> dict:
         leader_career_events=leader_derived["events"],
         world_rows=world_derived["worlds"],
         world_events=world_derived["events"],
+    )
+
+    db.replace_politics_data(
+        campaign_id,
+        states=politics_derived["states"],
+        events=politics_derived["events"],
     )
 
     diagnostic_dir = _diagnostics_dir(Path(campaign["archive_dir"]))
@@ -715,6 +807,14 @@ def review_campaign(db: Database, campaign_id: int) -> dict:
         technology_snapshots,
     )
     activity(f"Technology evidence diagnostic updated - diagnostics\\{technology_debug.name}")
+    politics_history_debug = write_politics_history_diagnostic(
+        diagnostic_dir,
+        politics_derived,
+    )
+    activity(
+        "Politics / diplomacy structured history updated - "
+        f"diagnostics\\{politics_history_debug.name}"
+    )
 
     activity(
         f"REVIEW DATA REBUILD COMPLETE - {_cache_summary(cache)} - "
@@ -809,6 +909,7 @@ def construct_campaign(
     science_snapshots = []
     combat_snapshots = []
     technology_snapshots = []
+    politics_snapshots = []
     errors: list[str] = []
     cache = _cache_counter()
 
@@ -830,6 +931,7 @@ def construct_campaign(
                 science_snapshot,
                 combat_snapshot,
                 technology_snapshot,
+                politics_snapshot,
                 cache_status,
             ) = load_or_parse_snapshot(
                 archive_path=Path(snapshot["archive_path"]),
@@ -869,6 +971,10 @@ def construct_campaign(
             technology_snapshots.append(
                 technology_snapshot
             )
+            if politics_snapshot is not None:
+                politics_snapshots.append(
+                    politics_snapshot
+                )
 
             activity(
                 "                  "
@@ -886,6 +992,8 @@ def construct_campaign(
                 f"Ship combat {len(combat_snapshot.ship_activity)} | "
                 f"Starbase combat {len(combat_snapshot.starbase_activity)} | "
                 f"Techs {len(technology_snapshot.technologies)} | "
+                f"Relations {len(politics_snapshot.relations) if politics_snapshot is not None else 0} | "
+                f"Traditions {len(politics_snapshot.traditions) if politics_snapshot is not None else 0} | "
                 f"Queued builds {len(parsed_snapshot.build_orders)}"
             )
 
@@ -949,6 +1057,9 @@ def construct_campaign(
     technology_summary = technology_evidence_summary(
         technology_snapshots
     )
+    politics_derived = derive_full_politics_history(
+        politics_snapshots
+    )
     correlated_engagements = derive_correlated_engagements(
         ship_fleet_snapshots,
         combat_snapshots,
@@ -977,6 +1088,7 @@ def construct_campaign(
         direct_combat_episodes=direct_combat_episodes,
         combat_episodes=combat_episodes,
         technology_snapshots=technology_snapshots,
+        politics_events=politics_derived["events"],
     )
 
     activity(
@@ -1029,6 +1141,12 @@ def construct_campaign(
         leader_career_events=leader_derived["events"],
         world_rows=world_derived["worlds"],
         world_events=world_derived["events"],
+    )
+
+    db.replace_politics_data(
+        campaign_id,
+        states=politics_derived["states"],
+        events=politics_derived["events"],
     )
 
     diagnostic_dir = _diagnostics_dir(Path(campaign["archive_dir"]))
@@ -1115,6 +1233,14 @@ def construct_campaign(
         technology_snapshots,
     )
     activity(f"Technology evidence diagnostic updated - diagnostics\\{technology_debug.name}")
+    politics_history_debug = write_politics_history_diagnostic(
+        diagnostic_dir,
+        politics_derived,
+    )
+    activity(
+        "Politics / diplomacy structured history updated - "
+        f"diagnostics\\{politics_history_debug.name}"
+    )
 
     newly_marked_processed = db.mark_all_processed(
         campaign_id

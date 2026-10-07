@@ -69,6 +69,16 @@ from .domains.technology.cache import (
     snapshot_from_dict as technology_snapshot_from_dict,
     snapshot_to_dict as technology_snapshot_to_dict,
 )
+from .domains.politics import (
+    CACHE_COMPONENT_NAME as POLITICS_COMPONENT_NAME,
+    CACHE_COMPONENT_VERSION as POLITICS_COMPONENT_VERSION,
+    PoliticsSnapshot,
+    extract_politics_snapshot,
+)
+from .domains.politics.cache import (
+    snapshot_from_dict as politics_snapshot_from_dict,
+    snapshot_to_dict as politics_snapshot_to_dict,
+)
 
 
 CACHE_SCHEMA_VERSION = 1
@@ -256,6 +266,7 @@ def _write(
     science_snapshot: ScienceSnapshot,
     combat_snapshot: CombatSnapshot,
     technology_snapshot: TechnologySnapshot,
+    politics_snapshot: PoliticsSnapshot | None,
 ) -> None:
     path.parent.mkdir(
         parents=True,
@@ -306,6 +317,14 @@ def _write(
                 "version": TECHNOLOGY_COMPONENT_VERSION,
                 "data": technology_snapshot_to_dict(
                     technology_snapshot
+                ),
+            },
+            POLITICS_COMPONENT_NAME: {
+                "version": POLITICS_COMPONENT_VERSION,
+                "data": (
+                    politics_snapshot_to_dict(politics_snapshot)
+                    if politics_snapshot is not None
+                    else None
                 ),
             },
         },
@@ -380,10 +399,11 @@ def load_or_parse_snapshot(
     ScienceSnapshot,
     CombatSnapshot,
     TechnologySnapshot,
+    PoliticsSnapshot | None,
     str,
 ]:
     """
-    Return profile, ship/fleet state, leader state, world state, science evidence, combat evidence, technology evidence and cache status.
+    Return profile, ship/fleet state, leader state, world state, science evidence, combat evidence, technology evidence, politics/diplomacy evidence and cache status.
 
     cache status is one of:
       hit    - all current parser components came from the persistent cache
@@ -456,6 +476,12 @@ def load_or_parse_snapshot(
         TECHNOLOGY_COMPONENT_VERSION,
     )
 
+    politics_data = _component_data(
+        payload,
+        POLITICS_COMPONENT_NAME,
+        POLITICS_COMPONENT_VERSION,
+    )
+
     profile = None
     ship_snapshot = None
     leader_snapshot = None
@@ -463,6 +489,7 @@ def load_or_parse_snapshot(
     science_snapshot = None
     combat_snapshot = None
     technology_snapshot = None
+    politics_snapshot = None
 
     try:
         if profile_data is not None:
@@ -506,6 +533,12 @@ def load_or_parse_snapshot(
                 snapshot_id=snapshot_id,
             )
 
+        if politics_data is not None:
+            politics_snapshot = politics_snapshot_from_dict(
+                politics_data,
+                snapshot_id=snapshot_id,
+            )
+
     except (
         KeyError,
         TypeError,
@@ -518,6 +551,7 @@ def load_or_parse_snapshot(
         science_snapshot = None
         combat_snapshot = None
         technology_snapshot = None
+        politics_snapshot = None
 
     if (
         profile is not None
@@ -527,6 +561,7 @@ def load_or_parse_snapshot(
         and science_snapshot is not None
         and combat_snapshot is not None
         and technology_snapshot is not None
+        and politics_snapshot is not None
     ):
         return (
             profile,
@@ -536,6 +571,7 @@ def load_or_parse_snapshot(
             science_snapshot,
             combat_snapshot,
             technology_snapshot,
+            politics_snapshot,
             "hit",
         )
 
@@ -612,6 +648,21 @@ def load_or_parse_snapshot(
                 snapshot_id=snapshot_id,
             )
 
+        if politics_snapshot is None:
+            try:
+                politics_snapshot = extract_politics_snapshot(
+                    gamestate=gamestate,
+                    profile=profile,
+                    source_save=source_save,
+                    snapshot_id=snapshot_id,
+                    leader_snapshot=leader_snapshot,
+                )
+            except Exception:
+                # Politics/Diplomacy is an additive evidence domain.  A parser
+                # problem must never invalidate the already supported history
+                # components or force the same save through Update History again.
+                politics_snapshot = None
+
         _write(
             path,
             source_sha256=source_sha256,
@@ -624,6 +675,7 @@ def load_or_parse_snapshot(
             science_snapshot=science_snapshot,
             combat_snapshot=combat_snapshot,
             technology_snapshot=technology_snapshot,
+            politics_snapshot=politics_snapshot,
         )
 
         return (
@@ -634,6 +686,7 @@ def load_or_parse_snapshot(
             science_snapshot,
             combat_snapshot,
             technology_snapshot,
+            politics_snapshot,
             "extend",
         )
 
@@ -698,6 +751,17 @@ def load_or_parse_snapshot(
         snapshot_id=snapshot_id,
     )
 
+    try:
+        politics_snapshot = extract_politics_snapshot(
+            gamestate=gamestate,
+            profile=profile,
+            source_save=source_save,
+            snapshot_id=snapshot_id,
+            leader_snapshot=leader_snapshot,
+        )
+    except Exception:
+        politics_snapshot = None
+
     _write(
         path,
         source_sha256=source_sha256,
@@ -710,6 +774,7 @@ def load_or_parse_snapshot(
         science_snapshot=science_snapshot,
         combat_snapshot=combat_snapshot,
         technology_snapshot=technology_snapshot,
+        politics_snapshot=politics_snapshot,
     )
 
     return (
@@ -720,5 +785,6 @@ def load_or_parse_snapshot(
         science_snapshot,
         combat_snapshot,
         technology_snapshot,
+        politics_snapshot,
         "miss",
     )

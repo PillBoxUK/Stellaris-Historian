@@ -518,6 +518,32 @@ def _clean_markup(text: str) -> str:
     ).strip()
 
 
+def resolve_localisation_key(
+    source_save: Path,
+    key: str | None,
+) -> str | None:
+    """Resolve one Stellaris/mod localisation key to cleaned display text.
+
+    This lightweight public helper reuses Historian's existing localisation
+    index and cache.  It is intentionally conservative: unresolved keys return
+    ``None`` so callers can apply their own readable fallback.
+    """
+    if not key:
+        return None
+
+    try:
+        index = _load_index_data(source_save)
+        raw = index.values.get(str(key))
+        if not raw:
+            return None
+        cleaned = _clean_markup(
+            _resolve_references(raw, index.values)
+        )
+        return cleaned or None
+    except Exception:
+        return None
+
+
 def _significant_origin_tokens(
     origin_key: str,
 ) -> list[str]:

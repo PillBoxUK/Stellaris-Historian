@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 import re
-from typing import Iterable
+from typing import Callable, Iterable
 
 from ...core.stellaris_text import (
     _extract_braced_after,
@@ -357,7 +357,11 @@ def _diff_relation(previous: dict, current: dict) -> list[str]:
     return lines
 
 
-def write_politics_diplomacy_probe(db: Database, campaign_id: int) -> Path:
+def write_politics_diplomacy_probe(
+    db: Database,
+    campaign_id: int,
+    progress: Callable[[int, int, dict], None] | None = None,
+) -> Path:
     campaign_row = db.campaign(campaign_id)
     if campaign_row is None:
         raise ValueError("Campaign does not exist.")
@@ -378,7 +382,10 @@ def write_politics_diplomacy_probe(db: Database, campaign_id: int) -> Path:
     political_key_frequency: Counter[str] = Counter()
     government_key_frequency: Counter[str] = Counter()
 
-    for snapshot in selected:
+    selected_total = len(selected)
+    for selected_index, snapshot in enumerate(selected, start=1):
+        if progress is not None:
+            progress(selected_index, selected_total, snapshot)
         try:
             meta, gamestate = read_save_texts(Path(snapshot["archive_path"]))
             profile = empire_profile_from_text(meta, gamestate)

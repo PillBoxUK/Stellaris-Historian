@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import json
 import re
 
 from .domains.combat.correlation import CorrelatedEngagement
@@ -182,6 +183,7 @@ def synthesize_historical_events(
     direct_combat_episodes: list | None = None,
     combat_episodes: list[CombatEpisode] | None = None,
     technology_snapshots: list,
+    politics_events: list[dict] | None = None,
 ) -> list[HistoricalEvent]:
     """Create the normalized, presentation-neutral historical event stream.
 
@@ -370,6 +372,44 @@ def synthesize_historical_events(
                     target_id=situation.target_id,
                 ),
             ))
+
+    for row in (politics_events or []):
+        if not int(row.get("visible", 0)):
+            continue
+        event_type = str(row.get("event_type") or "politics_evidence")
+        importance = {
+            "government_state_changed": 94,
+            "council_agenda_state_changed": 78,
+            "tradition_first_observed": 68,
+            "diplomatic_contact_first_observed": 72,
+            "communications_state_changed": 80,
+            "communications_block_changed": 80,
+            "hostility_state_changed": 88,
+            "hostility_block_changed": 88,
+            "neutral_state_changed": 74,
+            "neutral_block_changed": 74,
+            "relation_value_changed": 38,
+        }.get(event_type, 55)
+        raw_attributes = row.get("attributes")
+        if raw_attributes is None and row.get("attributes_json"):
+            try:
+                raw_attributes = json.loads(row.get("attributes_json") or "{}")
+            except (TypeError, json.JSONDecodeError):
+                raw_attributes = {}
+        if not isinstance(raw_attributes, dict):
+            raw_attributes = {}
+        events.append(HistoricalEvent(
+            game_date=str(row["game_date"]),
+            category=str(row.get("category") or "politics"),
+            event_type=event_type,
+            title=str(row["title"]),
+            summary=_neutralize_evidence_text(row["body"]),
+            confidence=str(row.get("confidence", "high")),
+            date_kind=str(row.get("date_kind", "first_observed")),
+            source="politics_diplomacy_history",
+            importance=importance,
+            attributes=_pairs(**raw_attributes),
+        ))
 
     if technology_snapshots:
         technology = derive_technology_history(technology_snapshots)

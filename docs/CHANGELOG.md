@@ -113,6 +113,44 @@
 
 # Stellaris Historian Changelog
 
+## v0.0.48.1
+- Hotfix: restores the `/api/live-history` endpoint accidentally removed by the v0.0.48 refresh-progress migration.
+- Restores the complete Update History and Review Campaign route block from the automatic v0.0.47.1 backup, then reapplies the intended v0.0.48 refresh changes with route-scoped anchors.
+- Keeps v0.0.48 Politics/Diplomacy filtering, refresh progress, localisation and diagnostic fixes intact.
+- No SQLite schema/data migration and no archived `.sav` changes.
+
+## v0.0.48
+- Politics/Diplomacy publication filtering now keeps routine `council_agenda_progress` telemetry in SQL/diagnostics but removes it from public historical narrative.
+- Actual council-agenda identity transitions remain publishable and receive readable titles.
+- Raw `relations_manager` evidence is still retained, while strong pseudo-country/event-entity indicators are filtered from public diplomatic contact/state history.
+- Politics/Diplomacy journal summary values now resolve through installed Stellaris/mod localisation with a readable fallback.
+- Fixed Event_Character_Probe_Debug.txt cache tuple compatibility after the v0.0.47 Politics cache component was added.
+- Fixed the invalid Python escape warning in the incremental Politics diagnostic path.
+- Review Campaign and Construct Campaign now show numbered REFRESH progress, per-step timing, failures, and an overall refresh summary.
+- Politics_Diplomacy_Probe_Debug.txt reports inner raw-sample scan progress during Review/Construct.
+- Live History now explicitly logs Historical_Journal.html refresh completion and duration.
+- Existing archived `.sav` files are not changed or deleted.
+
+## v0.0.47.1
+- Fixed Update History replaying snapshots whose normal history row had already been committed but whose `processed` flag was never reached after a Politics/Diplomacy failure.
+- Update History now reconciles such half-finished v0.0.47 rows from durable `history_entries` before selecting work.
+- Core history progress is marked processed independently of the additive Politics/Diplomacy persistence stage.
+- Politics/Diplomacy parser failures no longer invalidate otherwise-supported snapshot history.
+- Added a passive SQLite WAL checkpoint after each Update History batch so committed progress is flushed into `historian.db` when possible.
+- Review/Construct tolerate unavailable Politics snapshots while preserving the supported domains.
+- No archived `.sav` files are changed or deleted.
+
+## v0.0.47
+- Added a **Live History ON/OFF** toggle beside Update History. It is OFF by default and, when enabled, processes newly archived saves through the existing incremental history pipeline and refreshes `Historical_Journal.html` automatically.
+- Added `politics_diplomacy` snapshot-cache component v1 so Politics/Diplomacy evidence shares the same raw-save read as the other structured domains.
+- Added structured Politics/Diplomacy state and event persistence in `politics_states` and `politics_history_events`.
+- Added conservative government-state changes, ruler identity observations, council-agenda field transitions, tradition first-observations, first archived appearance of diplomatic relation records, communications/hostility/neutral-state changes and relation-value changes.
+- Relation-value transitions are retained but hidden from the normal public event stream to avoid chronology noise.
+- Ruler identity is retained in Politics/Diplomacy, while the People domain remains authoritative for public ruler career/succession milestones.
+- Added `diagnostics/Politics_History_Debug.txt`, a dedicated Politics & Diplomacy section in the Historical Journal, and integrated visible Politics/Diplomacy evidence into the shared Historical Event Layer used by Timeline and Scribes.
+- Review Campaign and Construct Campaign require Live History to be OFF to avoid concurrent history rebuilds.
+- Existing cache containers extend in place when the new Politics/Diplomacy component is first needed; no destructive cache reset is required.
+
 ## v0.0.46
 - Added an evidence-only Politics & Diplomacy Deep Probe.
 - Added `diagnostics/Politics_Diplomacy_Probe_Debug.txt`.

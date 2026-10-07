@@ -50,6 +50,11 @@ WATCHER = CampaignWatcher(
 
 ACTIVE_CAMPAIGN_ID: int | None = None
 server: uvicorn.Server | None = None
+LIVE_HISTORY_ENABLED = False
+LIVE_HISTORY_BUSY = False
+LIVE_HISTORY_STATUS = "OFF"
+LIVE_HISTORY_STOP = threading.Event()
+LIVE_HISTORY_THREAD: threading.Thread | None = None
 
 
 def _refresh_event_character_probe(campaign_id: int):
@@ -96,6 +101,148 @@ def _refresh_politics_diplomacy_probe(campaign_id: int):
         message = str(exc)
         error(f"POLITICS / DIPLOMACY PROBE - {message}")
         return None, message
+
+
+def _live_history_loop() -> None:
+    global LIVE_HISTORY_ENABLED, LIVE_HISTORY_BUSY, LIVE_HISTORY_STATUS
+
+    while not LIVE_HISTORY_STOP.is_set():
+        campaign_id = ACTIVE_CAMPAIGN_ID
+
+        if not LIVE_HISTORY_ENABLED or campaign_id is None:
+            LIVE_HISTORY_STOP.wait(1.0)
+            continue
+
+        try:
+            waiting = DB.unprocessed_count(campaign_id)
+            if waiting <= 0:
+                LIVE_HISTORY_STATUS = "ON - waiting for the next archived save"
+                LIVE_HISTORY_STOP.wait(1.0)
+                continue
+
+            LIVE_HISTORY_BUSY = True
+            LIVE_HISTORY_STATUS = f"ON - processing {waiting} archived save(s)"
+            activity(f"LIVE HISTORY - {waiting} archived save(s) waiting")
+            try:
+                result = process_unprocessed(DB, campaign_id)
+
+                if result["processed"]:
+                    activity("LIVE HISTORY - refreshing Historical_Journal.html...")
+                    journal_started = time.perf_counter()
+                    render_journal(DB, campaign_id)
+                    activity(
+                        "LIVE HISTORY - Historical_Journal.html refresh complete - "
+                        f"{format_duration(time.perf_counter() - journal_started)}"
+                    )
+
+                if result["errors"]:
+                    LIVE_HISTORY_ENABLED = False
+                    LIVE_HISTORY_STATUS = (
+                        "OFF - processing error: " + result["errors"][0]
+                    )
+                    error("LIVE HISTORY STOPPED - " + result["errors"][0])
+                else:
+                    LIVE_HISTORY_STATUS = (
+                        "ON - waiting for the next archived save"
+                        if LIVE_HISTORY_ENABLED
+                        else "OFF"
+                    )
+            finally:
+                LIVE_HISTORY_BUSY = False
+
+        except Exception as exc:
+            LIVE_HISTORY_ENABLED = False
+            LIVE_HISTORY_BUSY = False
+            LIVE_HISTORY_STATUS = f"OFF - processing error: {exc}"
+            error(f"LIVE HISTORY - {exc}")
+
+        LIVE_HISTORY_STOP.wait(1.0)
+
+
+def _start_live_history_worker() -> None:
+    global LIVE_HISTORY_THREAD
+    if LIVE_HISTORY_THREAD and LIVE_HISTORY_THREAD.is_alive():
+        return
+    LIVE_HISTORY_STOP.clear()
+    LIVE_HISTORY_THREAD = threading.Thread(
+        target=_live_history_loop,
+        name="stellaris-historian-live-history",
+        daemon=True,
+    )
+    LIVE_HISTORY_THREAD.start()
+    info("Live History worker started (OFF by default).")
+
+
+def _stop_live_history_worker() -> None:
+    LIVE_HISTORY_STOP.set()
+    if LIVE_HISTORY_THREAD and LIVE_HISTORY_THREAD.is_alive():
+        LIVE_HISTORY_THREAD.join(timeout=5)
+    info("Live History worker stopped.")
+
+
+def _run_refresh_step(index: int, total: int, label: str, action):
+    started = time.perf_counter()
+    activity(f"REFRESH [{index:02d}/{total:02d}] {label}...")
+    try:
+        result = action()
+    except Exception as exc:
+        message = str(exc)
+        error(f"REFRESH [{index:02d}/{total:02d}] {label} FAILED - {message}")
+        return None, message
+
+    activity(
+        f"REFRESH [{index:02d}/{total:02d}] {label} complete - "
+        f"{format_duration(time.perf_counter() - started)}"
+    )
+    return result, None
+
+
+def _origin_localisation_refresh(campaign_id: int):
+    campaign = DB.campaign(campaign_id)
+    if campaign is None:
+        raise ValueError("Campaign does not exist.")
+
+    snapshots = DB.all_snapshots(campaign_id)
+    start_snapshot = None
+    for snapshot in snapshots:
+        if snapshot["kind"] == "start":
+            start_snapshot = snapshot
+            break
+    if start_snapshot is None and snapshots:
+        start_snapshot = snapshots[0]
+    if start_snapshot is None:
+        raise ValueError("No archived snapshot is available for origin localisation.")
+
+    founding_profile = read_empire_profile(Path(start_snapshot["archive_path"]))
+    return write_origin_localisation_debug(
+        Path(campaign["source_save"]),
+        founding_profile.origin,
+        Path(campaign["archive_dir"]) / "Origin_Localisation_Debug.txt",
+    )
+
+
+def _politics_probe_refresh(
+    campaign_id: int,
+    step_index: int,
+    total_steps: int,
+):
+    last_reported = 0
+
+    def progress(done: int, total: int, snapshot: dict) -> None:
+        nonlocal last_reported
+        if done == 1 or done == total or done - last_reported >= 10:
+            last_reported = done
+            activity(
+                f"REFRESH [{step_index:02d}/{total_steps:02d}] "
+                "Politics_Diplomacy_Probe_Debug.txt - "
+                f"scanning {done}/{total} - {snapshot.get('game_date', 'unknown date')}"
+            )
+
+    return write_politics_diplomacy_probe(
+        DB,
+        campaign_id,
+        progress=progress,
+    )
 
 
 def safe_name(value: str, max_len: int = 60) -> str:
@@ -158,10 +305,12 @@ async def lifespan(app: FastAPI):
     )
 
     WATCHER.start()
+    _start_live_history_worker()
 
     try:
         yield
     finally:
+        _stop_live_history_worker()
         WATCHER.stop()
 
         info(
@@ -265,7 +414,13 @@ def api_recent_campaigns(limit: int = Query(default=5)):
 
 @app.post("/api/start-campaign")
 async def api_start_campaign(request: Request):
-    global ACTIVE_CAMPAIGN_ID
+    global ACTIVE_CAMPAIGN_ID, LIVE_HISTORY_ENABLED, LIVE_HISTORY_STATUS
+
+    if LIVE_HISTORY_BUSY:
+        raise HTTPException(
+            409,
+            "Live History is finishing an automatic update. Wait for it to finish before selecting another campaign.",
+        )
 
     payload = await request.json()
     raw_path = payload.get("save_path")
@@ -297,6 +452,8 @@ async def api_start_campaign(request: Request):
 
     campaign = get_or_create_campaign(selected)
     ACTIVE_CAMPAIGN_ID = int(campaign["id"])
+    LIVE_HISTORY_ENABLED = False
+    LIVE_HISTORY_STATUS = "OFF"
 
     WATCHER.select_campaign(
         selected,
@@ -317,6 +474,9 @@ def api_active_campaign():
             "version": APP_VERSION,
             "campaign": None,
             "monitoring": False,
+            "live_history_enabled": False,
+            "live_history_busy": False,
+            "live_history_status": "OFF",
         }
 
     campaign = DB.campaign(ACTIVE_CAMPAIGN_ID)
@@ -326,6 +486,9 @@ def api_active_campaign():
             "version": APP_VERSION,
             "campaign": None,
             "monitoring": False,
+            "live_history_enabled": False,
+            "live_history_busy": False,
+            "live_history_status": "OFF",
         }
 
     snapshots = [
@@ -346,6 +509,9 @@ def api_active_campaign():
         "campaign": dict(campaign),
         "monitoring": True,
         "watcher_status": WATCHER.status,
+        "live_history_enabled": LIVE_HISTORY_ENABLED,
+        "live_history_busy": LIVE_HISTORY_BUSY,
+        "live_history_status": LIVE_HISTORY_STATUS,
         "archive_count": DB.snapshot_count(ACTIVE_CAMPAIGN_ID),
         "unprocessed_count": DB.unprocessed_count(ACTIVE_CAMPAIGN_ID),
         "processed_count": DB.processed_count(ACTIVE_CAMPAIGN_ID),
@@ -357,6 +523,12 @@ def api_active_campaign():
 
 @app.post("/api/update-history")
 def api_update_history():
+    if LIVE_HISTORY_ENABLED or LIVE_HISTORY_BUSY:
+        raise HTTPException(
+            409,
+            "Live History is ON or finishing an automatic update. Wait for it to become fully OFF before running Update History manually.",
+        )
+
     if ACTIVE_CAMPAIGN_ID is None:
         raise HTTPException(
             400,
@@ -384,6 +556,8 @@ def api_update_history():
     )
 
     errors = result["errors"]
+    politics_warnings = result.get("politics_warnings", [])
+    recovered = int(result.get("recovered", 0) or 0)
 
     if errors:
         message = (
@@ -393,24 +567,71 @@ def api_update_history():
         )
     else:
         message = (
-            f"Processed {result['processed']} save(s). "
+            f"Processed {result['processed']} new save(s). "
+            f"{recovered} already-written save(s) were recovered from SQL. "
             f"Historical_Journal.html updated successfully. "
             f"{result['remaining']} save(s) remain unprocessed."
         )
+        if politics_warnings:
+            message += (
+                f" Politics/Diplomacy produced {len(politics_warnings)} warning(s); "
+                "core history progress was still saved and will not be replayed."
+            )
 
     return {
         "ok": len(errors) == 0,
         "processed": result["processed"],
         "remaining": result["remaining"],
         "errors": errors,
+        "politics_warnings": politics_warnings,
+        "recovered": recovered,
         "journal_path": str(journal),
         "journal_url": "/journal",
         "message": message,
     }
 
 
+@app.post("/api/live-history")
+async def api_live_history(request: Request):
+    global LIVE_HISTORY_ENABLED, LIVE_HISTORY_STATUS
+
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, "No campaign is active.")
+
+    payload = await request.json()
+    enabled = payload.get("enabled")
+    if not isinstance(enabled, bool):
+        raise HTTPException(400, "enabled must be true or false.")
+
+    LIVE_HISTORY_ENABLED = enabled
+    LIVE_HISTORY_STATUS = (
+        "ON - checking archived saves"
+        if enabled
+        else (
+            "OFF requested - finishing current history update"
+            if LIVE_HISTORY_BUSY
+            else "OFF"
+        )
+    )
+
+    activity(f"LIVE HISTORY {'ON' if enabled else 'OFF'}")
+
+    return {
+        "ok": True,
+        "enabled": LIVE_HISTORY_ENABLED,
+        "busy": LIVE_HISTORY_BUSY,
+        "status": LIVE_HISTORY_STATUS,
+    }
+
+
 @app.post("/api/review-campaign")
 def api_review_campaign():
+    if LIVE_HISTORY_ENABLED or LIVE_HISTORY_BUSY:
+        raise HTTPException(
+            409,
+            "Wait for Live History to be fully OFF before running Review Campaign.",
+        )
+
     if ACTIVE_CAMPAIGN_ID is None:
         raise HTTPException(
             400,
@@ -449,81 +670,62 @@ def api_review_campaign():
             ),
         }
 
+    refresh_started = time.perf_counter()
+    refresh_total = 5
+    activity(f"REFRESH START - {refresh_total} output(s)")
+
+    journal, journal_error = _run_refresh_step(
+        1,
+        refresh_total,
+        "Historical_Journal.html",
+        lambda: render_journal(DB, ACTIVE_CAMPAIGN_ID),
+    )
+    if journal_error:
+        raise HTTPException(500, f"Historical journal refresh failed: {journal_error}")
+
+    event_probe_path, event_probe_error = _run_refresh_step(
+        2,
+        refresh_total,
+        "Event_Character_Probe_Debug.txt",
+        lambda: write_event_character_probe(DB, ACTIVE_CAMPAIGN_ID),
+    )
+
+    notification_decoder_path, notification_decoder_error = _run_refresh_step(
+        3,
+        refresh_total,
+        "Notification_Event_Decoder_Debug.txt",
+        lambda: write_notification_event_decoder(DB, ACTIVE_CAMPAIGN_ID),
+    )
+
+    politics_probe_path, politics_probe_error = _run_refresh_step(
+        4,
+        refresh_total,
+        "Politics_Diplomacy_Probe_Debug.txt",
+        lambda: _politics_probe_refresh(ACTIVE_CAMPAIGN_ID, 4, refresh_total),
+    )
+
+    diagnostic_path, diagnostic_error = _run_refresh_step(
+        5,
+        refresh_total,
+        "Origin_Localisation_Debug.txt",
+        lambda: _origin_localisation_refresh(ACTIVE_CAMPAIGN_ID),
+    )
+
+    refresh_errors = [
+        value
+        for value in (
+            event_probe_error,
+            notification_decoder_error,
+            politics_probe_error,
+            diagnostic_error,
+        )
+        if value
+    ]
     activity(
-        "Rendering Historical_Journal.html..."
+        f"REFRESH COMPLETE - {refresh_total - len(refresh_errors)}/{refresh_total} succeeded - "
+        f"{len(refresh_errors)} failed - "
+        f"{format_duration(time.perf_counter() - refresh_started)}"
     )
-
-    journal_started = time.perf_counter()
-
-    journal = render_journal(
-        DB,
-        ACTIVE_CAMPAIGN_ID,
-    )
-
-    activity(
-        f"Journal rebuilt - {format_duration(time.perf_counter() - journal_started)}"
-    )
-
-    event_probe_path, event_probe_error = _refresh_event_character_probe(
-        ACTIVE_CAMPAIGN_ID
-    )
-
-    notification_decoder_path, notification_decoder_error = _refresh_notification_event_decoder(
-        ACTIVE_CAMPAIGN_ID
-    )
-
-    politics_probe_path, politics_probe_error = _refresh_politics_diplomacy_probe(
-        ACTIVE_CAMPAIGN_ID
-    )
-
-    diagnostic_path = None
-    diagnostic_error = None
-
-    try:
-        campaign = DB.campaign(
-            ACTIVE_CAMPAIGN_ID
-        )
-
-        snapshots = DB.all_snapshots(
-            ACTIVE_CAMPAIGN_ID
-        )
-
-        start_snapshot = None
-
-        for snapshot in snapshots:
-            if snapshot["kind"] == "start":
-                start_snapshot = snapshot
-                break
-
-        if start_snapshot is None and snapshots:
-            start_snapshot = snapshots[0]
-
-        if campaign is not None and start_snapshot is not None:
-            founding_profile = read_empire_profile(
-                Path(start_snapshot["archive_path"])
-            )
-
-            activity(
-                "Refreshing Origin_Localisation_Debug.txt..."
-            )
-
-            diagnostic_path = write_origin_localisation_debug(
-                Path(campaign["source_save"]),
-                founding_profile.origin,
-                Path(campaign["archive_dir"])
-                / "Origin_Localisation_Debug.txt",
-            )
-
-            activity(
-                "Origin localisation diagnostic updated."
-            )
-
-    except Exception as exc:
-        diagnostic_error = str(exc)
-
-        error(
-            f"ORIGIN DIAGNOSTIC - {diagnostic_error}"
-        )
 
     message = (
         f"Reviewed all {result['reviewed']} archived save(s). "
@@ -540,6 +742,12 @@ def api_review_campaign():
         message += (
             f" Origin localisation diagnostic could not be written: "
             f"{diagnostic_error}"
+        )
+
+    if refresh_errors:
+        message += (
+            f" {len(refresh_errors)} refresh output(s) reported errors; "
+            "see the console/log for the failed step."
         )
 
     return {
@@ -562,6 +770,12 @@ def api_review_campaign():
 
 @app.post("/api/construct-campaign")
 def api_construct_campaign():
+    if LIVE_HISTORY_ENABLED or LIVE_HISTORY_BUSY:
+        raise HTTPException(
+            409,
+            "Wait for Live History to be fully OFF before running Construct Campaign.",
+        )
+
     if ACTIVE_CAMPAIGN_ID is None:
         raise HTTPException(
             400,
@@ -601,81 +815,62 @@ def api_construct_campaign():
             ),
         }
 
+    refresh_started = time.perf_counter()
+    refresh_total = 5
+    activity(f"REFRESH START - {refresh_total} output(s)")
+
+    journal, journal_error = _run_refresh_step(
+        1,
+        refresh_total,
+        "Historical_Journal.html",
+        lambda: render_journal(DB, ACTIVE_CAMPAIGN_ID),
+    )
+    if journal_error:
+        raise HTTPException(500, f"Constructed journal refresh failed: {journal_error}")
+
+    event_probe_path, event_probe_error = _run_refresh_step(
+        2,
+        refresh_total,
+        "Event_Character_Probe_Debug.txt",
+        lambda: write_event_character_probe(DB, ACTIVE_CAMPAIGN_ID),
+    )
+
+    notification_decoder_path, notification_decoder_error = _run_refresh_step(
+        3,
+        refresh_total,
+        "Notification_Event_Decoder_Debug.txt",
+        lambda: write_notification_event_decoder(DB, ACTIVE_CAMPAIGN_ID),
+    )
+
+    politics_probe_path, politics_probe_error = _run_refresh_step(
+        4,
+        refresh_total,
+        "Politics_Diplomacy_Probe_Debug.txt",
+        lambda: _politics_probe_refresh(ACTIVE_CAMPAIGN_ID, 4, refresh_total),
+    )
+
+    diagnostic_path, diagnostic_error = _run_refresh_step(
+        5,
+        refresh_total,
+        "Origin_Localisation_Debug.txt",
+        lambda: _origin_localisation_refresh(ACTIVE_CAMPAIGN_ID),
+    )
+
+    refresh_errors = [
+        value
+        for value in (
+            event_probe_error,
+            notification_decoder_error,
+            politics_probe_error,
+            diagnostic_error,
+        )
+        if value
+    ]
     activity(
-        "Rendering Historical_Journal.html from reconstructed history..."
+        f"REFRESH COMPLETE - {refresh_total - len(refresh_errors)}/{refresh_total} succeeded - "
+        f"{len(refresh_errors)} failed - "
+        f"{format_duration(time.perf_counter() - refresh_started)}"
     )
-
-    journal_started = time.perf_counter()
-
-    journal = render_journal(
-        DB,
-        ACTIVE_CAMPAIGN_ID,
-    )
-
-    activity(
-        f"Constructed journal written - "
-        f"{format_duration(time.perf_counter() - journal_started)}"
-    )
-
-    event_probe_path, event_probe_error = _refresh_event_character_probe(
-        ACTIVE_CAMPAIGN_ID
-    )
-
-    notification_decoder_path, notification_decoder_error = _refresh_notification_event_decoder(
-        ACTIVE_CAMPAIGN_ID
-    )
-
-    diagnostic_path = None
-    diagnostic_error = None
-
-    try:
-        snapshots = DB.all_snapshots(
-            ACTIVE_CAMPAIGN_ID
-        )
-
-        start_snapshot = None
-
-        for snapshot in snapshots:
-            if snapshot["kind"] == "start":
-                start_snapshot = snapshot
-                break
-
-        if start_snapshot is None and snapshots:
-            start_snapshot = snapshots[0]
-
-        if start_snapshot is not None:
-            founding_profile = read_empire_profile(
-                Path(
-                    start_snapshot["archive_path"]
-                )
-            )
-
-            activity(
-                "Refreshing Origin_Localisation_Debug.txt..."
-            )
-
-            diagnostic_path = write_origin_localisation_debug(
-                Path(
-                    campaign["source_save"]
-                ),
-                founding_profile.origin,
-                Path(
-                    campaign["archive_dir"]
-                ) / "Origin_Localisation_Debug.txt",
-            )
-
-            activity(
-                "Origin localisation diagnostic updated."
-            )
-
-    except Exception as exc:
-        diagnostic_error = str(
-            exc
-        )
-
-        error(
-            f"ORIGIN DIAGNOSTIC - {diagnostic_error}"
-        )
 
     message = (
         f"Constructed {result['constructed']} archived save(s) from scratch. "
@@ -687,6 +882,12 @@ def api_construct_campaign():
         message += (
             f" Origin localisation diagnostic could not be refreshed: "
             f"{diagnostic_error}"
+        )
+
+    if refresh_errors:
+        message += (
+            f" {len(refresh_errors)} refresh output(s) reported errors; "
+            "see the console/log for the failed step."
         )
 
     return {

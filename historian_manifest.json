@@ -1,7 +1,7 @@
 {
   "application": "Stellaris Historian",
-  "version": "0.0.46",
-  "architecture": "modular-foundation-21-politics-diplomacy-deep-probe",
+  "version": "0.0.48.1",
+  "architecture": "modular-foundation-24-live-history-route-hotfix",
   "managed_roots": [
     "historian",
     "static",
@@ -45,9 +45,9 @@
       "cache_version": 1
     },
     "politics": {
-      "status": "diagnostic-deep-probe",
-      "cache_component": null,
-      "cache_version": null
+      "status": "modular-structured-evidence-first",
+      "cache_component": "politics_diplomacy",
+      "cache_version": 1
     }
   },
   "presentation": {
@@ -57,9 +57,9 @@
     "scribes_pdf": "direct book-style PDF generated from the same supported chronicle text"
   },
   "historical_event_layer": {
-    "status": "v0.0.46-shared-presentation-source-with-confirmed-leader-deaths",
+    "status": "v0.0.47-shared-presentation-source-with-structured-politics-diplomacy",
     "diagnostic": "diagnostics/Historical_Event_Debug.txt",
-    "purpose": "normalized source/confidence/date-kind events with structured attributes; Timeline and Scribes consume the same synthesized presentation source. Politics/Diplomacy remains diagnostic-only in v0.0.46."
+    "purpose": "normalized source/confidence/date-kind events with structured attributes; Timeline and Scribes consume the same synthesized presentation source. v0.0.47 adds conservative Politics/Diplomacy events."
   },
   "diagnostics": {
     "location": "<campaign archive>/diagnostics",
@@ -77,7 +77,8 @@
       "Event_Character_Probe_Debug.txt",
       "Notification_Event_Decoder_Debug.txt",
       "Notification_Death_Evidence_Debug.txt",
-      "Politics_Diplomacy_Probe_Debug.txt"
+      "Politics_Diplomacy_Probe_Debug.txt",
+      "Politics_History_Debug.txt"
     ],
     "console_path_reporting": true
   },
@@ -169,5 +170,59 @@
       "candidate global election/faction/federation/first-contact marker counts"
     ],
     "rule": "Raw keys and values are preserved literally. v0.0.46 does not infer or publish treaties, elections, factions, alliances, rivalries, succession causes or diplomatic outcomes from unfamiliar raw fields."
+  },
+  "live_history": {
+    "status": "active-opt-in",
+    "default": "off",
+    "behaviour": "when enabled, process newly archived saves through the normal incremental history pipeline and refresh Historical_Journal.html",
+    "safety": "Review Campaign and Construct Campaign require Live History to be off"
+  },
+  "politics_diplomacy_history": {
+    "status": "structured-evidence-first",
+    "cache_component": "politics_diplomacy",
+    "cache_version": 1,
+    "database_tables": [
+      "politics_states",
+      "politics_history_events"
+    ],
+    "published_evidence": [
+      "government profile changes",
+      "council agenda field transitions",
+      "tradition first observations",
+      "first archived appearance of player relation records",
+      "communications/hostility/neutral-state raw field changes"
+    ],
+    "retained_not_normally_published": [
+      "ruler identity mirror of People-domain evidence",
+      "relation-value changes"
+    ],
+    "rule": "No treaty, election, faction, alliance, rivalry, succession cause or diplomatic motive is inferred from unfamiliar raw fields."
+  },
+  "incremental_history": {
+    "status": "durable-sql-resume",
+    "progress_source": "snapshots.processed plus history_entries reconciliation",
+    "wal_checkpoint_after_update": true,
+    "politics_failure_blocks_core_progress": false,
+    "rule": "A Politics/Diplomacy parser or persistence warning must not cause an already-written core snapshot to replay on the next Update History run."
+  },
+  "politics_diplomacy_v2": {
+    "agenda_progress_publication": "diagnostic-only",
+    "agenda_identity_changes_public": true,
+    "non_diplomatic_relation_entities": "retained-but-filtered-from-public-history",
+    "summary_localisation": "installed Stellaris/mod localisation with readable fallback"
+  },
+  "refresh_progress": {
+    "review_and_construct_steps": true,
+    "politics_probe_inner_progress": true,
+    "live_journal_completion_log": true
+  },
+  "live_history_route_hotfix": {
+    "restored_routes": [
+      "/api/update-history",
+      "/api/live-history",
+      "/api/review-campaign"
+    ],
+    "cause": "v0.0.48 refresh migration matched the Update History journal anchor instead of Review Campaign",
+    "database_changes": false
   }
 }

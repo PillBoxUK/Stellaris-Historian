@@ -276,6 +276,42 @@ CREATE TABLE IF NOT EXISTS world_history_events (
     UNIQUE(campaign_id, event_key)
 );
 
+CREATE TABLE IF NOT EXISTS politics_states (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    snapshot_id INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,
+    game_date TEXT NOT NULL,
+    state_json TEXT NOT NULL,
+    created_utc TEXT NOT NULL,
+    UNIQUE(campaign_id, snapshot_id)
+);
+
+CREATE TABLE IF NOT EXISTS politics_history_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    event_key TEXT NOT NULL,
+    snapshot_id INTEGER REFERENCES snapshots(id) ON DELETE CASCADE,
+    game_date TEXT NOT NULL,
+    category TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    subject_id INTEGER,
+    subject_name TEXT,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    visible INTEGER NOT NULL DEFAULT 0,
+    confidence TEXT NOT NULL DEFAULT 'high',
+    date_kind TEXT NOT NULL DEFAULT 'first_observed',
+    attributes_json TEXT NOT NULL DEFAULT '{}',
+    created_utc TEXT NOT NULL,
+    UNIQUE(campaign_id, event_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_politics_states_campaign
+ON politics_states(campaign_id, snapshot_id);
+
+CREATE INDEX IF NOT EXISTS idx_politics_events_campaign
+ON politics_history_events(campaign_id, game_date, id);
+
 CREATE INDEX IF NOT EXISTS idx_snapshots_campaign
 ON snapshots(campaign_id, id);
 
@@ -581,6 +617,41 @@ class Database:
                     snapshot_id,
                 ),
             )
+
+    def reconcile_processed_snapshots(self, campaign_id: int) -> int:
+        """Recover durable progress when a history row exists but processed=1 was never reached.
+
+        v0.0.47 could commit the normal history entry and then fail in the new
+        Politics/Diplomacy stage before setting snapshots.processed.  Those rows
+        are safe to resume past: the normal history transaction already exists.
+        """
+        now = utc_now()
+        with self.connect() as con:
+            cur = con.execute(
+                """
+                UPDATE snapshots
+                SET processed=1,
+                    processed_utc=COALESCE(processed_utc, ?)
+                WHERE campaign_id=?
+                  AND processed=0
+                  AND EXISTS (
+                      SELECT 1
+                      FROM history_entries h
+                      WHERE h.campaign_id=snapshots.campaign_id
+                        AND h.snapshot_id=snapshots.id
+                  )
+                """,
+                (now, campaign_id),
+            )
+            return int(cur.rowcount if cur.rowcount is not None else 0)
+
+    def checkpoint(self) -> None:
+        """Ask SQLite to checkpoint committed WAL pages into historian.db."""
+        con = self.connect()
+        try:
+            con.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
+        finally:
+            con.close()
 
     def mark_all_processed(
         self,
@@ -1530,6 +1601,149 @@ class Database:
                         now,
                     ),
                 )
+
+    def apply_politics_delta(
+        self,
+        campaign_id: int,
+        data: dict,
+    ) -> None:
+        now = utc_now()
+        state = data.get("state") or {}
+        snapshot_id = state.get("snapshot_id")
+        game_date = state.get("game_date")
+
+        with self.connect() as con:
+            if snapshot_id is not None and game_date:
+                con.execute(
+                    """
+                    INSERT INTO politics_states(
+                        campaign_id, snapshot_id, game_date, state_json, created_utc
+                    )
+                    VALUES(?,?,?,?,?)
+                    ON CONFLICT(campaign_id, snapshot_id) DO UPDATE SET
+                        game_date=excluded.game_date,
+                        state_json=excluded.state_json,
+                        created_utc=excluded.created_utc
+                    """,
+                    (
+                        campaign_id,
+                        int(snapshot_id),
+                        str(game_date),
+                        json.dumps(state, ensure_ascii=True, separators=(",", ":")),
+                        now,
+                    ),
+                )
+
+            for event in data.get("events", []):
+                con.execute(
+                    """
+                    INSERT OR IGNORE INTO politics_history_events(
+                        campaign_id, event_key, snapshot_id, game_date, category,
+                        event_type, subject_id, subject_name, title, body, visible,
+                        confidence, date_kind, attributes_json, created_utc
+                    )
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        campaign_id,
+                        event["event_key"],
+                        event.get("snapshot_id"),
+                        event["game_date"],
+                        event.get("category", "politics"),
+                        event["event_type"],
+                        event.get("subject_id"),
+                        event.get("subject_name"),
+                        event["title"],
+                        event["body"],
+                        event.get("visible", 0),
+                        event.get("confidence", "high"),
+                        event.get("date_kind", "first_observed"),
+                        json.dumps(event.get("attributes") or {}, ensure_ascii=True, separators=(",", ":")),
+                        now,
+                    ),
+                )
+
+    def replace_politics_data(
+        self,
+        campaign_id: int,
+        *,
+        states: list[dict],
+        events: list[dict],
+    ) -> None:
+        now = utc_now()
+        with self.connect() as con:
+            con.execute("DELETE FROM politics_history_events WHERE campaign_id=?", (campaign_id,))
+            con.execute("DELETE FROM politics_states WHERE campaign_id=?", (campaign_id,))
+
+            for row in states:
+                state = row.get("state") or {}
+                con.execute(
+                    """
+                    INSERT INTO politics_states(
+                        campaign_id, snapshot_id, game_date, state_json, created_utc
+                    )
+                    VALUES(?,?,?,?,?)
+                    """,
+                    (
+                        campaign_id,
+                        int(row["snapshot_id"]),
+                        str(row["game_date"]),
+                        json.dumps(state, ensure_ascii=True, separators=(",", ":")),
+                        now,
+                    ),
+                )
+
+            for event in events:
+                con.execute(
+                    """
+                    INSERT INTO politics_history_events(
+                        campaign_id, event_key, snapshot_id, game_date, category,
+                        event_type, subject_id, subject_name, title, body, visible,
+                        confidence, date_kind, attributes_json, created_utc
+                    )
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        campaign_id,
+                        event["event_key"],
+                        event.get("snapshot_id"),
+                        event["game_date"],
+                        event.get("category", "politics"),
+                        event["event_type"],
+                        event.get("subject_id"),
+                        event.get("subject_name"),
+                        event["title"],
+                        event["body"],
+                        event.get("visible", 0),
+                        event.get("confidence", "high"),
+                        event.get("date_kind", "first_observed"),
+                        json.dumps(event.get("attributes") or {}, ensure_ascii=True, separators=(",", ":")),
+                        now,
+                    ),
+                )
+
+    def politics_states(self, campaign_id: int):
+        with self.connect() as con:
+            return con.execute(
+                """
+                SELECT * FROM politics_states
+                WHERE campaign_id=?
+                ORDER BY snapshot_id ASC
+                """,
+                (campaign_id,),
+            ).fetchall()
+
+    def politics_events(self, campaign_id: int, *, visible_only: bool = False):
+        query = """
+            SELECT * FROM politics_history_events
+            WHERE campaign_id=?
+        """
+        params: list[object] = [campaign_id]
+        if visible_only:
+            query += " AND visible=1"
+        query += " ORDER BY game_date ASC, id ASC"
+        with self.connect() as con:
+            return con.execute(query, params).fetchall()
 
     def replace_review_data(
         self,

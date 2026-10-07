@@ -82,6 +82,21 @@ button{
 button:hover{background:#294c66}
 button:disabled{opacity:.45;cursor:not-allowed}
 
+.live-history-button{
+  border-color:#5b6672;
+  background:#252d36;
+}
+
+.live-history-button.live-on{
+  border-color:#4c8a65;
+  background:#214b32;
+  color:#e7fff0;
+}
+
+.live-history-button.live-on:hover{
+  background:#2a6241;
+}
+
 .close-button{
   border-color:#743e3e;
   background:#3b2020;

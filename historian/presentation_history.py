@@ -164,6 +164,9 @@ def build_presentation_history(db: Database, campaign_id: int) -> PresentationHi
     world_history = {
         "events": [dict(row) for row in db.world_history_events(campaign_id, visible_only=False)]
     }
+    politics_events = [
+        dict(row) for row in db.politics_events(campaign_id, visible_only=False)
+    ]
 
     events = synthesize_historical_events(
         history_entries=history_entries,
@@ -175,6 +178,7 @@ def build_presentation_history(db: Database, campaign_id: int) -> PresentationHi
         direct_combat_episodes=direct_episodes,
         combat_episodes=combat_episodes,
         technology_snapshots=technology_snapshots,
+        politics_events=politics_events,
     )
 
     return PresentationHistory(

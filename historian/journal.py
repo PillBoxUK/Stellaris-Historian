@@ -9,6 +9,7 @@ from .db import Database
 from .domains.people.journal import render_people_section
 from .domains.ships.journal import render_ships_section
 from .domains.science.journal import render_science_section
+from .domains.politics.journal import render_politics_section
 from .localisation import resolve_origin_lore
 from .save_reader import read_empire_profile
 from .domains.worlds.journal import format_population_units
@@ -393,6 +394,11 @@ def render_journal(
         </section>
         """
 
+    politics_html = render_politics_section(
+        db,
+        campaign_id,
+    )
+
     science_html = render_science_section(
         db,
         campaign_id,
@@ -429,7 +435,12 @@ def render_journal(
 
     if people_html.strip():
         nav_links.append(
-            '<a href="#people-history">People &amp; Politics</a>'
+            '<a href="#people-history">People &amp; Leaders</a>'
+        )
+
+    if politics_html.strip():
+        nav_links.append(
+            '<a href="#politics-diplomacy">Politics &amp; Diplomacy</a>'
         )
 
     if science_html.strip():
@@ -1204,6 +1215,12 @@ th{{
   {
     f'<div id="people-history" class="journal-anchor">{people_html}</div>'
     if people_html.strip()
+    else ''
+  }
+
+  {
+    f'<div id="politics-diplomacy" class="journal-anchor">{politics_html}</div>'
+    if politics_html.strip()
     else ''
   }
 
