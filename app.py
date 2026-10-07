@@ -30,6 +30,7 @@ from historian.watcher import CampaignWatcher
 from historian.domains.people.event_probe import write_event_character_probe
 from historian.domains.people.notification_decoder import write_notification_event_decoder
 from historian.domains.politics.probe import write_politics_diplomacy_probe
+from historian.domains.politics.first_contact_probe import write_first_contact_probe
 
 
 APP_VERSION = __version__
@@ -243,6 +244,26 @@ def _politics_probe_refresh(
         campaign_id,
         progress=progress,
     )
+
+
+def _first_contact_probe_refresh(
+    campaign_id: int,
+    step_index: int,
+    total_steps: int,
+):
+    last_reported = 0
+
+    def progress(done: int, total: int, snapshot: dict) -> None:
+        nonlocal last_reported
+        if done == 1 or done == total or done - last_reported >= 10:
+            last_reported = done
+            activity(
+                f"REFRESH [{step_index:02d}/{total_steps:02d}] "
+                "First_Contact_Probe_Debug.txt - "
+                f"scanning {done}/{total} - {snapshot.get('game_date', 'unknown date')}"
+            )
+
+    return write_first_contact_probe(DB, campaign_id, progress=progress)
 
 
 def safe_name(value: str, max_len: int = 60) -> str:
@@ -467,6 +488,28 @@ async def api_start_campaign(request: Request):
     }
 
 
+@app.post("/api/select-new-campaign")
+def api_select_new_campaign():
+    global ACTIVE_CAMPAIGN_ID, LIVE_HISTORY_ENABLED, LIVE_HISTORY_STATUS
+
+    if LIVE_HISTORY_BUSY:
+        raise HTTPException(
+            409,
+            "Live History is finishing an automatic update. Wait for it to finish before selecting another campaign.",
+        )
+
+    previous_campaign = DB.campaign(ACTIVE_CAMPAIGN_ID) if ACTIVE_CAMPAIGN_ID is not None else None
+    LIVE_HISTORY_ENABLED = False
+    LIVE_HISTORY_STATUS = "OFF"
+    WATCHER.clear_campaign()
+    ACTIVE_CAMPAIGN_ID = None
+
+    label = previous_campaign["empire_name"] if previous_campaign is not None else "no active campaign"
+    activity(f"SELECT NEW CAMPAIGN - stopped monitoring {label}")
+
+    return {"ok": True, "redirect": "/"}
+
+
 @app.get("/api/active-campaign")
 def api_active_campaign():
     if ACTIVE_CAMPAIGN_ID is None:
@@ -671,7 +714,7 @@ def api_review_campaign():
         }
 
     refresh_started = time.perf_counter()
-    refresh_total = 5
+    refresh_total = 6
     activity(f"REFRESH START - {refresh_total} output(s)")
 
     journal, journal_error = _run_refresh_step(
@@ -704,8 +747,15 @@ def api_review_campaign():
         lambda: _politics_probe_refresh(ACTIVE_CAMPAIGN_ID, 4, refresh_total),
     )
 
-    diagnostic_path, diagnostic_error = _run_refresh_step(
+    first_contact_probe_path, first_contact_probe_error = _run_refresh_step(
         5,
+        refresh_total,
+        "First_Contact_Probe_Debug.txt",
+        lambda: _first_contact_probe_refresh(ACTIVE_CAMPAIGN_ID, 5, refresh_total),
+    )
+
+    diagnostic_path, diagnostic_error = _run_refresh_step(
+        6,
         refresh_total,
         "Origin_Localisation_Debug.txt",
         lambda: _origin_localisation_refresh(ACTIVE_CAMPAIGN_ID),
@@ -717,6 +767,7 @@ def api_review_campaign():
             event_probe_error,
             notification_decoder_error,
             politics_probe_error,
+            first_contact_probe_error,
             diagnostic_error,
         )
         if value
@@ -816,7 +867,7 @@ def api_construct_campaign():
         }
 
     refresh_started = time.perf_counter()
-    refresh_total = 5
+    refresh_total = 6
     activity(f"REFRESH START - {refresh_total} output(s)")
 
     journal, journal_error = _run_refresh_step(
@@ -849,8 +900,15 @@ def api_construct_campaign():
         lambda: _politics_probe_refresh(ACTIVE_CAMPAIGN_ID, 4, refresh_total),
     )
 
-    diagnostic_path, diagnostic_error = _run_refresh_step(
+    first_contact_probe_path, first_contact_probe_error = _run_refresh_step(
         5,
+        refresh_total,
+        "First_Contact_Probe_Debug.txt",
+        lambda: _first_contact_probe_refresh(ACTIVE_CAMPAIGN_ID, 5, refresh_total),
+    )
+
+    diagnostic_path, diagnostic_error = _run_refresh_step(
+        6,
         refresh_total,
         "Origin_Localisation_Debug.txt",
         lambda: _origin_localisation_refresh(ACTIVE_CAMPAIGN_ID),
@@ -862,6 +920,7 @@ def api_construct_campaign():
             event_probe_error,
             notification_decoder_error,
             politics_probe_error,
+            first_contact_probe_error,
             diagnostic_error,
         )
         if value

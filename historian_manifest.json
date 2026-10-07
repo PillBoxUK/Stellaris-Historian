@@ -1,7 +1,7 @@
 {
   "application": "Stellaris Historian",
-  "version": "0.0.48.1",
-  "architecture": "modular-foundation-24-live-history-route-hotfix",
+  "version": "0.0.49",
+  "architecture": "modular-foundation-24-campaign-navigation-first-contact-probe",
   "managed_roots": [
     "historian",
     "static",
@@ -78,7 +78,8 @@
       "Notification_Event_Decoder_Debug.txt",
       "Notification_Death_Evidence_Debug.txt",
       "Politics_Diplomacy_Probe_Debug.txt",
-      "Politics_History_Debug.txt"
+      "Politics_History_Debug.txt",
+      "First_Contact_Probe_Debug.txt"
     ],
     "console_path_reporting": true
   },
@@ -224,5 +225,17 @@
     ],
     "cause": "v0.0.48 refresh migration matched the Update History journal anchor instead of Review Campaign",
     "database_changes": false
+  },
+  "first_contact_probe": {
+    "status": "diagnostic-correlation-foundation",
+    "cache_version_change": false,
+    "raw_sample_maximum": 48,
+    "evidence": [
+      "leader first_contact_system assignment transitions",
+      "adjacent structured relation-record appearances",
+      "adjacent communications-field changes",
+      "targeted raw first_contact/contact/communications keys and contexts"
+    ],
+    "rule": "Correlation is diagnostic-only; exact First Contact completion, counterpart and response choice are not published without direct retained evidence."
   }
 }

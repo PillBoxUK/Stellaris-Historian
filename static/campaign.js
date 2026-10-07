@@ -8,6 +8,7 @@ const processedCount = document.getElementById("processed-count");
 const monitorStatus = document.getElementById("monitor-status");
 const archiveList = document.getElementById("archive-list");
 const status = document.getElementById("status");
+const selectCampaignButton = document.getElementById("select-new-campaign");
 const updateButton = document.getElementById("update-history");
 const liveHistoryButton = document.getElementById("live-history");
 const reviewButton = document.getElementById("review-campaign");
@@ -35,6 +36,11 @@ function applyActionAvailability(data = latestCampaignState){
   const liveEnabled = Boolean(data.live_history_enabled);
   const liveBusy = Boolean(data.live_history_busy);
   const liveBlocking = liveEnabled || liveBusy;
+
+  selectCampaignButton.disabled = actionInProgress || liveBusy;
+  selectCampaignButton.title = liveBusy
+    ? "Wait for the current Live History update to finish before selecting another campaign."
+    : "Stop monitoring this campaign and return to campaign selection.";
 
   updateButton.disabled =
     actionInProgress || liveBlocking || unprocessed === 0;
@@ -135,6 +141,25 @@ async function loadActive(){
       `Could not refresh campaign status: ${error}`;
   }
 }
+
+selectCampaignButton.addEventListener("click", async () => {
+  actionInProgress = true;
+  applyActionAvailability();
+  status.textContent = "Stopping campaign monitoring and returning to campaign selection...";
+
+  try{
+    const response = await fetch("/api/select-new-campaign", {method:"POST"});
+    const data = await response.json();
+    if(!response.ok){
+      throw new Error(data.detail || "Could not return to campaign selection.");
+    }
+    window.location.href = data.redirect || "/";
+  }catch(error){
+    status.textContent = `Could not select a new campaign: ${error.message}`;
+    actionInProgress = false;
+    applyActionAvailability();
+  }
+});
 
 liveHistoryButton.addEventListener("click", async () => {
   const currentlyEnabled = Boolean(latestCampaignState?.live_history_enabled);

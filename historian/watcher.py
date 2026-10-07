@@ -96,6 +96,17 @@ class CampaignWatcher:
             f"Monitoring selected campaign: {label}"
         )
 
+    def clear_campaign(self) -> None:
+        with self._lock:
+            self._selected_path = None
+            self._campaign_id = None
+            self._candidate_signature = None
+            self._candidate_since = None
+            self._processed_signature = None
+            self.status = "Waiting for campaign"
+
+        info("Campaign monitoring cleared - waiting for campaign selection.")
+
     def selected(self) -> tuple[Path | None, int | None]:
         with self._lock:
             return self._selected_path, self._campaign_id

@@ -6,12 +6,14 @@ It is designed to turn a Stellaris campaign into a living historical archive, tr
 
 ## Current version
 
-v0.0.48.1
+v0.0.49
 
 ## Features
 
 - Watches Stellaris Ironman saves automatically
 - Live History ON/OFF can automatically process newly archived saves
+- Select New Campaign returns safely to campaign selection without refreshing the browser
+- First Contact evidence probe correlates assignment windows, diplomacy state and targeted raw-save structures
 - Tracks historical changes between saves
 - Builds campaign timelines
 - Tracks leaders and notable people

@@ -113,6 +113,16 @@
 
 # Stellaris Historian Changelog
 
+## v0.0.49
+- Added a blue **Select New Campaign** control to the campaign header with a visual spacer separating navigation from current-campaign actions.
+- Added `/api/select-new-campaign` and watcher deselection support. Returning to campaign selection turns Live History OFF, stops monitoring the current save, and leaves all archives/history data untouched.
+- Added `diagnostics/First_Contact_Probe_Debug.txt`, a dedicated evidence-first First Contact foundation.
+- The First Contact probe correlates cached leader `first_contact_system` assignment transitions with adjacent Politics/Diplomacy relation/communications changes.
+- Review Campaign and Construct Campaign now run First Contact as refresh step 5/6 with targeted raw-save progress; Origin Localisation becomes step 6/6.
+- Raw First Contact structures are sampled around assignment transitions and the recent campaign edge, capped at 48 raw archive reads.
+- v0.0.49 does not claim an exact First Contact date, counterpart or response choice unless a later decoder establishes those fields directly.
+- No SQLite schema change, no parsed-cache version bump, and no archived `.sav` changes.
+
 ## v0.0.48.1
 - Hotfix: restores the `/api/live-history` endpoint accidentally removed by the v0.0.48 refresh-progress migration.
 - Restores the complete Update History and Review Campaign route block from the automatic v0.0.47.1 backup, then reapplies the intended v0.0.48 refresh changes with route-scoped anchors.

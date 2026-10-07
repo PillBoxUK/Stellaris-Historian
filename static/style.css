@@ -30,7 +30,7 @@ header{
 }
 
 .brand{
-  margin-right:auto;
+  margin-right:0;
   min-width:0;
 }
 
@@ -95,6 +95,22 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 .live-history-button.live-on:hover{
   background:#2a6241;
+}
+
+.campaign-nav-button{
+  border-color:#4f8fba;
+  background:#215b82;
+  color:#eef8ff;
+  white-space:nowrap;
+}
+
+.campaign-nav-button:hover{
+  background:#2a739f;
+}
+
+.campaign-action-spacer{
+  flex:1 1 70px;
+  min-width:28px;
 }
 
 .close-button{
@@ -220,6 +236,7 @@ main{
 @media(max-width:980px){
   header{flex-wrap:wrap}
   .brand{width:100%}
+  .campaign-action-spacer{display:none}
   .header-control{min-width:0;max-width:none;flex:1}
 }
 
