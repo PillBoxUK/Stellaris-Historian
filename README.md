@@ -1,28 +1,76 @@
-# Stellaris Historian v0.0.36
-## Empire Timeline + Scribes Authorship + Direct PDF Export
+# Stellaris Historian
 
-This patch is intentionally presentation-focused before the next combat-correlation stage.
+Stellaris Historian is a local companion application for Stellaris that watches Ironman save files and builds a historical record of your empire over time.
 
-### New
-- **Empire Timeline**: simple year-by-year events with category filters and `People of Note` callouts.
-- **As the Scribes Saw It** remains permanently and now includes evidence-led ruler-authored sign-off blocks.
-- The **final Chronicle page remains unsigned** because the active campaign is still being written.
-- **Export PDF** on Scribes creates a real `Scribes_Chronicle.pdf` directly; browser print remains available separately.
-- Historical Journal now links directly to **Empire Timeline** as well as **As the Scribes Saw It**.
+It is designed to turn a Stellaris campaign into a living historical archive, tracking major developments such as leaders, ships, technologies, worlds, combat events, and other campaign milestones.
 
-### Evidence rules
-- Signatories come from actual dated ruler observations in the cached leader evidence.
-- `last_combat_activity` can only appear as cautious combat activity until stronger correlation exists.
-- No unsupported battle result, casualty, death, speech, motive or succession reason is invented.
+## Current version
 
-### Install
-1. Stop Stellaris Historian.
-2. Extract this ZIP over `G:\codex\StellarisHistorian\` and allow overwrite.
-3. Run `start.bat`.
-4. The launcher will install the added ReportLab dependency automatically if required.
-5. Open **View Journal**. You can now choose **Empire Timeline** or **As the Scribes Saw It**.
-6. In Scribes View, use **Export PDF** for the book-style PDF.
+v0.0.42
 
-**Restart required: YES.**
+## Features
 
-GitHub repository initialized.
+- Watches Stellaris Ironman saves automatically
+- Tracks historical changes between saves
+- Builds campaign timelines
+- Tracks leaders and notable people
+- Tracks ships and fleet history
+- Tracks technology progress
+- Tracks worlds and empire development
+- Tracks combat evidence and battle events
+- Generates historical journal-style output
+- Local web dashboard
+- No cloud service required
+
+## Requirements
+
+- Windows
+- Python 3
+- Stellaris
+- Steam version currently assumed by the default configuration
+
+## Installation
+
+1. Download the repository.
+2. Extract it to a folder of your choice.
+3. Copy `config.example.json`.
+4. Rename the copy to `config.json`.
+5. Edit `config.json` and set your Stellaris save location.
+
+Example save path:
+
+`C:\Program Files (x86)\Steam\userdata\YOUR_STEAM_USER_ID\281990\remote\save games`
+
+6. Run `start.bat`.
+
+Stellaris Historian will create its Python environment and install required dependencies if needed.
+
+## Dashboard
+
+Once running, the dashboard is available at:
+
+`http://127.0.0.1:8766`
+
+## Updating
+
+If you downloaded the project using Git, update it with:
+
+`git pull`
+
+Then restart Stellaris Historian if the update requires it.
+
+## Data and privacy
+
+Stellaris Historian runs locally on your computer.
+
+Your personal `config.json`, save files, logs, databases, backups, and other runtime data are excluded from this GitHub repository.
+
+## Project status
+
+Stellaris Historian is under active development.
+
+The current codebase includes migration and historical tracking work through version 0.0.42.
+
+## Author
+
+PillBoxUK
