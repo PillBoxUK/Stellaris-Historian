@@ -14,6 +14,7 @@ def _event_evidence(row) -> str:
     date_kind = row["date_kind"]
     label_map = {
         "exact_save_field": "Recorded recruitment date",
+        "exact_notification_date": "Exact retained death-notification date",
         "first_observed": "First observed in archive",
         "between_snapshots": "Between archived states",
     }
@@ -69,6 +70,10 @@ def _leader_role(row) -> str:
 def _leader_status(row) -> str:
     if row["status"] == "present":
         return "Present in latest archive"
+    if row["status"] == "dead_confirmed":
+        return "Dead - retained death evidence confirmed"
+    if row["status"] == "tombstoned_unconfirmed":
+        return "Removed from active leader record - cause unconfirmed"
     return "No longer present - cause unconfirmed"
 
 

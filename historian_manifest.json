@@ -1,7 +1,7 @@
 {
   "application": "Stellaris Historian",
-  "version": "0.0.44",
-  "architecture": "modular-foundation-19-notification-event-object-decoder",
+  "version": "0.0.45",
+  "architecture": "modular-foundation-20-notification-derived-leader-deaths",
   "managed_roots": [
     "historian",
     "static",
@@ -15,7 +15,7 @@
   ],
   "domains": {
     "people": {
-      "status": "modular-deep-character-notification-event-decoder",
+      "status": "modular-deep-character-notification-derived-deaths",
       "cache_component": "leaders",
       "cache_version": 5
     },
@@ -52,7 +52,7 @@
     "scribes_pdf": "direct book-style PDF generated from the same supported chronicle text"
   },
   "historical_event_layer": {
-    "status": "v0.0.41-shared-presentation-source",
+    "status": "v0.0.45-shared-presentation-source-with-confirmed-leader-deaths",
     "diagnostic": "diagnostics/Historical_Event_Debug.txt",
     "purpose": "normalized source/confidence/date-kind events with structured attributes; Timeline and Scribes consume the same synthesized presentation source"
   },
@@ -70,21 +70,23 @@
       "Character_Evidence_Debug.txt",
       "Raw_Evidence_Probe.txt",
       "Event_Character_Probe_Debug.txt",
-      "Notification_Event_Decoder_Debug.txt"
+      "Notification_Event_Decoder_Debug.txt",
+      "Notification_Death_Evidence_Debug.txt"
     ],
     "console_path_reporting": true
   },
   "character_evidence": {
-    "status": "v0.0.44-notification-event-object-decoder",
+    "status": "v0.0.45-notification-derived-leader-deaths",
     "database_table": "leader_deep_evidence",
     "diagnostics": [
       "diagnostics/Character_Evidence_Debug.txt",
       "diagnostics/Raw_Evidence_Probe.txt",
       "diagnostics/Leader_Exit_Evidence_Debug.txt",
       "diagnostics/Event_Character_Probe_Debug.txt",
-      "diagnostics/Notification_Event_Decoder_Debug.txt"
+      "diagnostics/Notification_Event_Decoder_Debug.txt",
+      "diagnostics/Notification_Death_Evidence_Debug.txt"
     ],
-    "rules": "Raw leader evidence remains conservative. v0.0.44 decodes retained message/notification objects around leader exits and only links a message to a leader when a typed leader reference survives in that message. Notification timing, player_event IDs and generic save_on_death fields never establish death by themselves."
+    "rules": "Leader death is promoted only from explicit retained death evidence. v0.0.45 accepts a retained LEADER_DEATH / MESSAGE_LEADER_LOST_DESC notification when its LEADER variable uniquely matches one known player leader, that leader has an unresolved exit in the same archive interval, and the notification date falls inside that interval. Tombstones and disappearances remain unconfirmed without qualifying evidence."
   },
   "event_character_probe": {
     "status": "targeted-raw-window-probe",
@@ -117,6 +119,26 @@
       "player_event selections",
       "scripted event_id values"
     ],
-    "rule": "Only explicit typed leader references can directly connect a retained message object to a leader. Missing notification payloads are reported as expired/not retained and are never reconstructed."
+    "rule": "Explicit typed leader references remain direct identity evidence. For retained LEADER_DEATH messages, v0.0.45 also recognizes a LEADER variable that uniquely matches one known player leader; death promotion still requires the matching unresolved exit and date-window checks. Missing notification payloads are never reconstructed."
+  },
+  "notification_derived_deaths": {
+    "status": "active",
+    "cache_version_change": false,
+    "evidence_kind": "notification_leader_death_named",
+    "requirements": [
+      "type=LEADER_DEATH",
+      "localization=MESSAGE_LEADER_LOST_DESC",
+      "LEADER variable uniquely matches one known player leader",
+      "leader has unresolved exit in same first-absent snapshot",
+      "notification date is after last confirmed presence and no later than first absent archive state"
+    ],
+    "persisted_fields": [
+      "death_date",
+      "death_reason_key",
+      "death_reason_value",
+      "death_evidence_kind",
+      "death_first_observed_date"
+    ],
+    "rule": "Name/timing promotion is narrowly scoped to retained LEADER_DEATH objects; ordinary notification timing never proves death."
   }
 }

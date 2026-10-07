@@ -158,7 +158,12 @@ def _leader_id(event: HistoricalEvent) -> int | None:
 
 def _leader_is_notable(event: HistoricalEvent, leaders: dict[int, object]) -> bool:
     event_type = event.event_type
-    if event_type in {"leader_became_ruler", "leader_left_rulership", "leader_missing_unconfirmed"}:
+    if event_type in {
+        "leader_became_ruler",
+        "leader_left_rulership",
+        "leader_death_recorded",
+        "leader_missing_unconfirmed",
+    }:
         return True
     leader_id = _leader_id(event)
     leader = leaders.get(leader_id) if leader_id is not None else None

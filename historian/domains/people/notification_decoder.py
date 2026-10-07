@@ -228,6 +228,34 @@ def _counter_added(before: Counter[str], after: Counter[str]) -> list[tuple[str,
 
 
 
+def _normalise_leader_name(value: object | None) -> str:
+    if value is None:
+        return ""
+    text = str(value)
+    text = re.sub(r"\x11[A-Za-z](.*?)\x11!", r"\1", text)
+    text = "".join(ch if ord(ch) >= 32 else " " for ch in text)
+    return re.sub(r"\s+", " ", text).strip().casefold()
+
+
+def _unique_named_leader_match(
+    message: dict,
+    *,
+    leader_id: int,
+    leader_rows: dict[int, dict],
+) -> bool:
+    variables = {str(key): str(value) for key, value in message.get("variables", ())}
+    retained_name = variables.get("LEADER")
+    if not retained_name:
+        return False
+    wanted = _normalise_leader_name(retained_name)
+    matching = [
+        candidate_id
+        for candidate_id, row in leader_rows.items()
+        if _normalise_leader_name(row.get("name")) == wanted
+    ]
+    return matching == [leader_id]
+
+
 def _leader_exit_rows(db: Database, campaign_id: int) -> tuple[list[dict], dict[int, dict]]:
     exits = [
         dict(row)
@@ -249,9 +277,11 @@ def write_notification_event_decoder(
 
     This is evidence discovery only. Leader exits are read from the already
     rebuilt database, then only the narrow raw-save windows around those exits
-    are opened. A message is linked to a leader only when a typed leader
-    reference is retained in the message itself. Timing alone is never
-    promoted to causation.
+    are opened. Explicit typed leader references remain direct identity evidence.
+    v0.0.45 additionally recognizes a LEADER variable inside a retained
+    LEADER_DEATH message when that name uniquely matches one known player leader;
+    the promotion layer still requires a matching exit interval and exact date.
+    Timing alone is never promoted to causation.
     """
     campaign = db.campaign(campaign_id)
     if campaign is None:
@@ -285,7 +315,7 @@ def write_notification_event_decoder(
         "",
         "Purpose: decode retained Stellaris message/notification objects around unresolved leader exits.",
         "A notification-ID increase proves that notifications were allocated in an interval, but a missing retained message object means its original payload may already have expired from the save.",
-        "A message is linked to a leader only when an explicit typed leader reference survives inside that message object. Timing alone is correlation, not causation.",
+        "A message can support a leader identity through either an explicit typed leader reference or, for LEADER_DEATH messages, a LEADER variable that uniquely matches one known player leader. Timing alone is correlation, not causation.",
         "The generic save_on_death field is NOT treated as leader-death evidence; Stellaris also stores it on unrelated objects such as countries and planets.",
         "",
         f"Campaign: {campaign['empire_name']}",
@@ -417,6 +447,17 @@ def write_notification_event_decoder(
                     )
                 else:
                     lines.append("      Exact typed leader link: None")
+                if _unique_named_leader_match(
+                    message,
+                    leader_id=leader_id,
+                    leader_rows=leader_rows,
+                ):
+                    lines.append(
+                        "      UNIQUE LEADER-NAME MATCH: "
+                        + str(leader_row.get("name") or leader_id)
+                    )
+                else:
+                    lines.append("      Unique leader-name match: None")
                 lines.append(f"      raw: {message['raw']}")
 
             lines.append("")
@@ -468,7 +509,7 @@ def write_notification_event_decoder(
         lines.extend([
             "",
             "  INTERPRETATION",
-            "    Only an explicit typed leader reference inside a retained message object can directly connect that message to this leader. Counter movement, an allocated-but-expired notification ID, or a new player_event ID remains correlation evidence only.",
+            "    An explicit typed leader reference is direct identity evidence. For a retained LEADER_DEATH message, a LEADER variable can also identify the subject when it uniquely matches one known player leader and the death date fits that leader's exit interval. Counter movement, an allocated-but-expired notification ID, or a new player_event ID remains correlation evidence only.",
             "",
         ])
 
@@ -486,6 +527,7 @@ def write_notification_event_decoder(
         "DECODER RULES",
         "=============",
         "- Retained message fields such as type/localization/date/variables/targets are raw save evidence.",
+        "- v0.0.45 may promote a retained LEADER_DEATH message when its LEADER variable uniquely identifies the exiting player leader and the date falls inside that exit interval.",
         "- Missing message objects are reported as expired/not retained; their payload is not invented.",
         "- Notification-ID gaps are preserved because ephemeral messages can disappear before the next quarterly archive.",
         "- player_event IDs are not equated with scripted event keys unless a later parser proves that mapping.",

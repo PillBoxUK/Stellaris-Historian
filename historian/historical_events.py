@@ -235,6 +235,8 @@ def synthesize_historical_events(
         "leader_council_changed": 68,
         "leader_level_changed": 42,
         "leader_traits_gained": 52,
+        "leader_death_recorded": 98,
+        "leader_tombstone_unconfirmed": 88,
         "leader_missing_unconfirmed": 88,
     }
     for row in leader_history.get("events", []):
@@ -242,7 +244,17 @@ def synthesize_historical_events(
             continue
         event_type = str(row["event_type"])
         attributes = _pairs(leader_id=row.get("leader_id"))
-        if event_type == "leader_missing_unconfirmed":
+        if event_type == "leader_death_recorded":
+            attributes = _pairs(
+                leader_id=row.get("leader_id"),
+                death_established="true",
+                evidence_kind=row.get("death_evidence_kind") or "retained_death_evidence",
+                notification_id=row.get("notification_id"),
+                recorded_age=row.get("recorded_age"),
+                recorded_service=row.get("time_served"),
+                death_reason=row.get("death_reason"),
+            )
+        elif event_type in {"leader_missing_unconfirmed", "leader_tombstone_unconfirmed"}:
             attributes = _pairs(
                 leader_id=row.get("leader_id"),
                 death_established="false",

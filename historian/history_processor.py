@@ -6,6 +6,11 @@ import time
 from .console import activity, error, format_duration, warning
 from .db import Database
 from .domains.people.history import derive_full_leader_history, leader_transition_data
+from .domains.people.notification_deaths import (
+    apply_notification_deaths,
+    promote_notification_deaths_in_database,
+    write_notification_death_diagnostic,
+)
 from .domains.people.exit_diagnostic import write_leader_exit_diagnostic
 from .domains.people.evidence_diagnostic import (
     character_evidence_summary,
@@ -364,6 +369,23 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
             errors.append(message)
             error(f"UPDATE HISTORY - {message}")
 
+    try:
+        notification_death_incremental = promote_notification_deaths_in_database(
+            db,
+            campaign_id,
+        )
+        write_notification_death_diagnostic(
+            _diagnostics_dir(Path(campaign["archive_dir"])),
+            notification_death_incremental,
+        )
+        if notification_death_incremental.get("confirmed", 0):
+            activity(
+                "Notification-derived leader deaths promoted - "
+                f"{notification_death_incremental['confirmed']} confirmed"
+            )
+    except Exception as exc:
+        error(f"NOTIFICATION-DERIVED LEADER DEATHS - {exc}")
+
     remaining = db.unprocessed_count(
         campaign_id
     )
@@ -508,6 +530,10 @@ def review_campaign(db: Database, campaign_id: int) -> dict:
     leader_derived = derive_full_leader_history(
         leader_snapshots
     )
+    notification_death_summary = apply_notification_deaths(
+        snapshots,
+        leader_derived,
+    )
     character_summary = character_evidence_summary(
         leader_snapshots,
         leader_derived,
@@ -642,6 +668,14 @@ def review_campaign(db: Database, campaign_id: int) -> dict:
     activity(
         "Combat episode diagnostic updated - "
         f"diagnostics\\{combat_episode_debug.name}"
+    )
+    notification_death_debug = write_notification_death_diagnostic(
+        diagnostic_dir,
+        notification_death_summary,
+    )
+    activity(
+        "Notification-derived leader death diagnostic updated - "
+        f"diagnostics\\{notification_death_debug.name}"
     )
     leader_exit_debug = write_leader_exit_diagnostic(
         diagnostic_dir,
@@ -895,6 +929,10 @@ def construct_campaign(
     leader_derived = derive_full_leader_history(
         leader_snapshots
     )
+    notification_death_summary = apply_notification_deaths(
+        snapshots,
+        leader_derived,
+    )
     character_summary = character_evidence_summary(
         leader_snapshots,
         leader_derived,
@@ -1030,6 +1068,14 @@ def construct_campaign(
     activity(
         "Combat episode diagnostic updated - "
         f"diagnostics\\{combat_episode_debug.name}"
+    )
+    notification_death_debug = write_notification_death_diagnostic(
+        diagnostic_dir,
+        notification_death_summary,
+    )
+    activity(
+        "Notification-derived leader death diagnostic updated - "
+        f"diagnostics\\{notification_death_debug.name}"
     )
     leader_exit_debug = write_leader_exit_diagnostic(
         diagnostic_dir,

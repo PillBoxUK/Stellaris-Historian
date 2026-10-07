@@ -21,8 +21,8 @@ def write_leader_exit_diagnostic(archive_dir: Path, leader_history: dict) -> Pat
         "STELLARIS HISTORIAN - LEADER EXIT EVIDENCE DEBUG",
         "",
         "Purpose: distinguish disappearance from explicit retained death evidence.",
-        "v0.0.42 probes the raw dead_leader block. A leader is only called dead when a retained dead_leader record supports that interpretation.",
-        "If no dead_leader record exists, disappearance remains an unconfirmed exit; screenshots or human memory are not silently converted into save evidence.",
+        "Historian accepts explicit dead_leader records and validated retained LEADER_DEATH notifications that uniquely name the exiting leader.",
+        "A tombstone or disappearance without qualifying death evidence remains an unconfirmed exit; screenshots or human memory are not silently converted into save evidence.",
         "",
         f"Confirmed death transitions: {len(confirmed)}",
         f"Tombstoned-but-cause-unconfirmed transitions: {len(tombstoned)}",
@@ -52,7 +52,7 @@ def write_leader_exit_diagnostic(archive_dir: Path, leader_history: dict) -> Pat
             f"  Death/cause field: {leader.get('death_reason_key') or 'Not established'}",
             f"  Death/cause value: {leader.get('death_reason_value') or 'Not established'}",
             f"  Death evidence kind: {leader.get('death_evidence_kind') or 'None'}",
-            f"  Interpretation: {('death supported by raw dead_leader evidence' if confirmed_death else ('active leader object tombstoned; cause still unconfirmed' if tombstoned_exit else 'disappearance/exit only'))}",
+            f"  Interpretation: {('death supported by retained ' + str(leader.get('death_evidence_kind') or 'death evidence') if confirmed_death else ('active leader object tombstoned; cause still unconfirmed' if tombstoned_exit else 'disappearance/exit only'))}",
             "",
         ])
 

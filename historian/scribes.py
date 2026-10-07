@@ -604,7 +604,17 @@ def _people_chapter(campaign, leaders, career_events) -> str:
             traits = _clean_traits(row["trait_names"])
             if traits:
                 text += f" The surviving service description includes {_join_words(traits[:5])}."
-            if row["status"] != "present":
+            if row["status"] == "dead_confirmed":
+                death_events = [
+                    event for event in events_by_leader.get(int(row["leader_id"]), [])
+                    if event["event_type"] == "leader_death_recorded"
+                ]
+                if death_events:
+                    death = death_events[-1]
+                    text += f" The surviving rolls record the death on {_natural_date(death['game_date'])}."
+                else:
+                    text += " The surviving rolls record the leader as dead, though the death notice is not reproduced here."
+            elif row["status"] != "present":
                 text += (
                     f" The name is last confirmed in {_year(row['last_seen_date'])}; after that the record falls silent, "
                     "without establishing death, retirement or reassignment."
@@ -625,13 +635,28 @@ def _people_chapter(campaign, leaders, career_events) -> str:
             "and the chronicle leaves their words unwritten where no words survive."
         )
 
-    # Preserve unexplained departures once, even if they were already mentioned above.
+    # Preserve confirmed deaths and unexplained departures once, even if mentioned above.
     non_scientist_missing = [row for row in missing if row["leader_class"] != "scientist"]
     for row in non_scientist_missing:
-        paragraphs.append(
-            f"{row['name']} is last confirmed in {_year(row['last_seen_date'])}; thereafter the name disappears from the surviving rolls. "
-            "The reason is not recorded, and no later scribe can honestly supply it."
-        )
+        if row["status"] == "dead_confirmed":
+            death_events = [
+                event for event in events_by_leader.get(int(row["leader_id"]), [])
+                if event["event_type"] == "leader_death_recorded"
+            ]
+            if death_events:
+                death = death_events[-1]
+                paragraphs.append(
+                    f"The surviving rolls record the death of {row['name']} on {_natural_date(death['game_date'])}."
+                )
+            else:
+                paragraphs.append(
+                    f"The surviving rolls record {row['name']} as dead, though the surviving chronicle does not reproduce the notice here."
+                )
+        else:
+            paragraphs.append(
+                f"{row['name']} is last confirmed in {_year(row['last_seen_date'])}; thereafter the name disappears from the surviving rolls. "
+                "The reason is not recorded, and no later scribe can honestly supply it."
+            )
 
     return _chapter(
         "chapter-people",

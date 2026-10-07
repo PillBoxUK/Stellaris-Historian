@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.0.45
+- Added conservative promotion of retained `LEADER_DEATH` notifications into confirmed People-domain deaths.
+- Promotion requires `MESSAGE_LEADER_LOST_DESC`, a unique exact `LEADER` name match, an unresolved exit in the same archive interval and an exact notification date inside that exit interval.
+- Confirmed notification deaths now persist exact death date, retained custom death text and `death_evidence_kind=notification_leader_death_named`.
+- Career history replaces the corresponding unresolved tombstone/disappearance event with a visible `leader_death_recorded` event containing retained age/service evidence.
+- Added `Notification_Death_Evidence_Debug.txt` with confirmed and rejected/ambiguous candidates.
+- Updated the Historical Event Layer and Empire Timeline so confirmed leader deaths are high-importance People events.
+- Updated Evidence Journal and Scribes handling so confirmed deaths are not described as unexplained disappearances.
+- Updated the v0.0.44 notification decoder to report unique leader-name matches as identity evidence.
+- People cache remains v5; no database schema, archive-save or processed-flag reset is required.
+- Review Campaign is required once; Construct Campaign is not required.
+
 ## v0.0.44
 - Added targeted decoding of retained Stellaris `message={...}` objects around leader-exit windows.
 - Records notification IDs, message type, localization key, dates, variables, typed targets and retained `custom_message_text`.
