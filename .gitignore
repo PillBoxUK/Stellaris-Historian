@@ -1,0 +1,14 @@
+__pycache__/
+.venv/
+venv/
+logs/
+backups/
+data/
+*.pyc
+*.log
+*.sqlite
+*.sqlite3
+*.sav
+Stellaris Backup.zip
+Updates and source/
+config.json

@@ -1,0 +1,9 @@
+{
+ "save_root": "C:\\Program Files (x86)\\Steam\\userdata\\YOUR_STEAM_USER_ID\\281990\\remote\\save games",
+  "host": "127.0.0.1",
+  "port": 8766,
+  "recent_campaign_limit": 5,
+  "open_browser": true,
+  "poll_seconds": 2.0,
+  "stable_seconds": 3.0
+}

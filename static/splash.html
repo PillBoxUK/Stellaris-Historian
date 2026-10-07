@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stellaris Historian</title>
+<link rel="stylesheet" href="/static/style.css?v=003">
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="eyebrow">STELLARIS HISTORIAN v<span id="app-version">--</span></div>
+    <h1>Historical Timeline</h1>
+  </div>
+
+  <select id="campaign-limit" class="small-control" aria-label="Number of campaigns">
+    <option value="5" selected>Last 5</option>
+    <option value="10">Last 10</option>
+    <option value="20">Last 20</option>
+    <option value="25">Last 25</option>
+  </select>
+
+  <select id="campaign-select" class="header-control" aria-label="Campaign">
+    <option value="">Loading campaigns...</option>
+  </select>
+
+  <button id="start-campaign" type="button" disabled>
+    Start Campaign
+  </button>
+
+  <button id="refresh-campaigns" type="button">
+    Refresh
+  </button>
+
+  <button id="close-app" class="close-button" type="button">
+    Close
+  </button>
+</header>
+
+<main>
+  <section class="splash">
+    <h2>Select a campaign to begin</h2>
+    <p>
+      Choose the campaign you want Stellaris Historian to track.
+      Monitoring starts only after you press Start Campaign.
+    </p>
+
+    <div id="status" class="status">Scanning Stellaris saves...</div>
+  </section>
+</main>
+
+<script src="/static/splash.js?v=004"></script>
+</body>
+</html>

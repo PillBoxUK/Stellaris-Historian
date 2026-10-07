@@ -1,0 +1,59 @@
+STELLARIS HISTORIAN v0.0.34 - COMBAT ACTIVITY EVIDENCE
+=======================================================
+
+INSTALL
+-------
+1. Stop the currently running Stellaris Historian.
+2. Extract this ZIP directly over:
+
+   G:\codex\StellarisHistorian\
+
+3. Allow Windows to overwrite the matching files.
+4. Run start.bat.
+
+EXPECTED FIRST START
+--------------------
+The console should show:
+
+  STELLARIS HISTORIAN v0.0.34
+  Running one-time v0.0.34 combat activity evidence migration...
+  v0.0.34 combat activity evidence migration complete.
+
+The migration log is written to:
+
+  logs\MIGRATION_v0.0.34.log
+
+Then use Review Campaign once. Existing snapshot cache containers are preserved,
+but their Combat component will extend from cache version 1 to version 2.
+
+WHAT v0.0.34 ADDS
+-----------------
+- exact ship last_combat_activity evidence
+- exact starbase-station last_combat_activity evidence
+- first-observed fleet/commander/system context for ship markers
+- first-observed system context for starbase markers
+- separate console counts for formal battles vs combat-activity markers
+- expanded Combat_Evidence_Debug.txt
+
+WHAT IT DOES NOT DO YET
+-----------------------
+- no battle stories are published to the Historical Journal
+- no opponent is inferred from last_combat_activity alone
+- no victory/defeat is inferred from last_combat_activity alone
+- no disappeared ship is automatically called destroyed
+- no kill-counter interpretation yet
+
+VALIDATION AGAINST THE SUTHARIAN BACKUP
+---------------------------------------
+The v0.0.34 parser was checked against all 228 archived Sutharian saves supplied
+with the pre-patch backup. The archive contains:
+
+  Formal wars:                 0
+  Formal battle records:       0
+  Ship combat-activity markers: 121 across 45 ship IDs
+  Starbase activity markers:    21 across 5 starbase IDs
+
+The latest 2256.10.01 save independently yields 39 mobile ships / 10 mobile
+fleets, with 8 surviving ship combat markers and 5 surviving starbase markers.
+
+RESTART REQUIRED: YES

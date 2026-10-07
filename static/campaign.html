@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stellaris Historian - Campaign</title>
+<link rel="stylesheet" href="/static/style.css?v=005">
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="eyebrow">ACTIVE CAMPAIGN - HISTORIAN v<span id="app-version">--</span></div>
+    <h1 id="campaign-title">Loading campaign...</h1>
+  </div>
+
+  <button id="update-history" type="button">
+    Update History
+  </button>
+
+  <button id="review-campaign" type="button">
+    Review Campaign
+  </button>
+
+  <button id="construct-campaign" class="danger-button" type="button">
+    Construct Campaign
+  </button>
+
+  <button id="view-journal" type="button" disabled>
+    View Journal
+  </button>
+
+  <button id="close-app" class="close-button" type="button">
+    Close
+  </button>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>Campaign</h2>
+    <p class="muted">
+      Historian is monitoring only this selected campaign.
+      Update History processes only new archived saves.
+      Review Campaign re-reads the entire archived campaign using the current
+      Historian logic and becomes available when no saves are waiting for history.
+      Construct Campaign discards the parsed cache and rebuilds the generated
+      history from every archived save.
+    </p>
+
+    <div class="data-grid">
+      <div class="data-card">
+        <span>Empire</span>
+        <strong id="empire-name">--</strong>
+      </div>
+
+      <div class="data-card">
+        <span>In-game date</span>
+        <strong id="game-date">--</strong>
+      </div>
+
+      <div class="data-card">
+        <span>Archived saves</span>
+        <strong id="archive-count">0</strong>
+      </div>
+
+      <div class="data-card">
+        <span>Unprocessed saves</span>
+        <strong id="unprocessed-count">0</strong>
+      </div>
+
+      <div class="data-card">
+        <span>Processed saves</span>
+        <strong id="processed-count">0</strong>
+      </div>
+
+      <div class="data-card">
+        <span>Monitoring</span>
+        <strong id="monitor-status">Starting...</strong>
+      </div>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <div class="folder-actions" aria-label="Campaign folders">
+      <button id="open-campaign-folder" type="button">
+        Open Campaign Folder
+      </button>
+
+      <button id="open-diagnostics-folder" type="button">
+        Open Diagnostics Folder
+      </button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Recent archived saves</h2>
+
+    <div class="archive-list" id="archive-list">
+      Waiting for the first archive...
+    </div>
+  </section>
+</main>
+
+
+<div id="construct-modal" class="modal-backdrop" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="construct-title">
+    <div class="modal-warning-icon">!</div>
+    <h2 id="construct-title">Reconstruct campaign from scratch?</h2>
+
+    <p>
+      Historian will discard its parsed snapshot cache and rebuild all generated
+      historical analysis for this campaign from every archived Stellaris save.
+    </p>
+
+    <p class="modal-danger-text">
+      This can take a long time for large campaigns.
+    </p>
+
+    <div class="modal-safe-note">
+      Your archived Stellaris <strong>.sav</strong> files will NOT be deleted.
+    </div>
+
+    <div class="modal-actions">
+      <button id="construct-cancel" type="button">
+        Cancel
+      </button>
+
+      <button id="construct-confirm" class="danger-button" type="button">
+        Yes, Construct Campaign
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/campaign.js?v=009"></script>
+</body>
+</html>

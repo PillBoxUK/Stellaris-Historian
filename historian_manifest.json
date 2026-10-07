@@ -1,0 +1,85 @@
+{
+  "application": "Stellaris Historian",
+  "version": "0.0.42",
+  "architecture": "modular-foundation-17-character-deep-evidence",
+  "managed_roots": [
+    "historian",
+    "static",
+    "docs"
+  ],
+  "protected_roots": [
+    ".venv",
+    "data",
+    "backups",
+    "Updates and source"
+  ],
+  "domains": {
+    "people": {
+      "status": "modular-deep-character-evidence-death-probe",
+      "cache_component": "leaders",
+      "cache_version": 5
+    },
+    "ships": {
+      "status": "modular-selective-refit-publication",
+      "cache_component": "ship_fleet",
+      "cache_version": 2
+    },
+    "worlds": {
+      "status": "modular",
+      "cache_component": "worlds",
+      "cache_version": 2
+    },
+    "science": {
+      "status": "modular-journal-publication",
+      "cache_component": "science",
+      "cache_version": 1
+    },
+    "combat": {
+      "status": "direct-telemetry-correlation-episode-synthesis",
+      "cache_component": "combat",
+      "cache_version": 3
+    },
+    "technology": {
+      "status": "modular-evidence-first",
+      "cache_component": "technology",
+      "cache_version": 1
+    }
+  },
+  "presentation": {
+    "historical_journal": "evidence-led technical ledger",
+    "scribes_view": "deterministic in-universe chronicle using synthesized combat episodes; granular evidence remains in the journal/diagnostics",
+    "empire_timeline": "selective chronology rendered from the shared Historical Event Layer, including major combat episodes and technology milestones",
+    "scribes_pdf": "direct book-style PDF generated from the same supported chronicle text"
+  },
+  "historical_event_layer": {
+    "status": "v0.0.41-shared-presentation-source",
+    "diagnostic": "diagnostics/Historical_Event_Debug.txt",
+    "purpose": "normalized source/confidence/date-kind events with structured attributes; Timeline and Scribes consume the same synthesized presentation source"
+  },
+  "diagnostics": {
+    "location": "<campaign archive>/diagnostics",
+    "files": [
+      "Science_Evidence_Debug.txt",
+      "Science_Interpretation_Debug.txt",
+      "Combat_Evidence_Debug.txt",
+      "Combat_Correlation_Debug.txt",
+      "Historical_Event_Debug.txt",
+      "Technology_Evidence_Debug.txt",
+      "Combat_Episode_Debug.txt",
+      "Leader_Exit_Evidence_Debug.txt",
+      "Character_Evidence_Debug.txt",
+      "Raw_Evidence_Probe.txt"
+    ],
+    "console_path_reporting": true
+  },
+  "character_evidence": {
+    "status": "v0.0.42-deep-evidence",
+    "database_table": "leader_deep_evidence",
+    "diagnostics": [
+      "diagnostics/Character_Evidence_Debug.txt",
+      "diagnostics/Raw_Evidence_Probe.txt",
+      "diagnostics/Leader_Exit_Evidence_Debug.txt"
+    ],
+    "rules": "Raw leader dates/age/background/event-target aliases are preserved without inventing birth, death, dismissal, execution or biography semantics. Death is promoted only from explicit retained dead-leader evidence."
+  }
+}
