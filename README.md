@@ -74,3 +74,13 @@ The current codebase includes migration and historical tracking work through ver
 ## Author
 
 PillBoxUK
+
+
+MPORTANT – PLEASE READ
+Stellaris Historian is experimental software and is provided “as is”, without warranty of any kind.
+You download, install and use it entirely at your own risk.
+Please make backups of any Stellaris saves or other data that you consider important before using it.
+Although the program is intended to read and analyse Stellaris save data locally, bugs, compatibility problems, configuration errors or other unexpected behaviour may occur.
+To the fullest extent permitted by applicable law, I accept no responsibility or liability for any loss, damage, corrupted saves, lost gameplay progress, lost data, software or system problems, or other direct or consequential damages resulting from the installation or use of Stellaris Historian.
+By using the software you accept responsibility for maintaining your own backups and recovery copies.
+Nothing in this disclaimer excludes or limits liability where doing so would be prohibited by applicable law.
