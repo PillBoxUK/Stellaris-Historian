@@ -29,6 +29,7 @@ from historian.save_reader import read_campaign_summary, read_empire_profile, va
 from historian.watcher import CampaignWatcher
 from historian.domains.people.event_probe import write_event_character_probe
 from historian.domains.people.notification_decoder import write_notification_event_decoder
+from historian.domains.politics.probe import write_politics_diplomacy_probe
 
 
 APP_VERSION = __version__
@@ -80,6 +81,22 @@ def _refresh_notification_event_decoder(campaign_id: int):
         message = str(exc)
         error(f"NOTIFICATION / EVENT DECODER - {message}")
         return None, message
+
+
+def _refresh_politics_diplomacy_probe(campaign_id: int):
+    try:
+        activity("Refreshing Politics_Diplomacy_Probe_Debug.txt...")
+        path = write_politics_diplomacy_probe(DB, campaign_id)
+        activity(
+            "Politics / diplomacy deep probe updated - "
+            f"{path.name}"
+        )
+        return path, None
+    except Exception as exc:
+        message = str(exc)
+        error(f"POLITICS / DIPLOMACY PROBE - {message}")
+        return None, message
+
 
 def safe_name(value: str, max_len: int = 60) -> str:
     value = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", value)
@@ -452,6 +469,10 @@ def api_review_campaign():
     )
 
     notification_decoder_path, notification_decoder_error = _refresh_notification_event_decoder(
+        ACTIVE_CAMPAIGN_ID
+    )
+
+    politics_probe_path, politics_probe_error = _refresh_politics_diplomacy_probe(
         ACTIVE_CAMPAIGN_ID
     )
 

@@ -6,7 +6,7 @@ It is designed to turn a Stellaris campaign into a living historical archive, tr
 
 ## Current version
 
-v0.0.45
+v0.0.46
 
 ## Features
 
@@ -18,6 +18,7 @@ v0.0.45
 - Tracks technology progress
 - Tracks worlds and empire development
 - Tracks combat evidence and battle events
+- Tracks politics and diplomatic raw evidence through an evidence-only deep probe
 - Generates historical journal-style output
 - Local web dashboard
 - No cloud service required
@@ -69,7 +70,7 @@ Your personal `config.json`, save files, logs, databases, backups, and other run
 
 Stellaris Historian is under active development.
 
-The current codebase includes migration and historical tracking work through version 0.0.43.
+The current codebase includes migration and historical tracking work through version 0.0.46.
 
 ## Author
 

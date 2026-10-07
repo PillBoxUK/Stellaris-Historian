@@ -1,7 +1,7 @@
 {
   "application": "Stellaris Historian",
-  "version": "0.0.45",
-  "architecture": "modular-foundation-20-notification-derived-leader-deaths",
+  "version": "0.0.46",
+  "architecture": "modular-foundation-21-politics-diplomacy-deep-probe",
   "managed_roots": [
     "historian",
     "static",
@@ -43,6 +43,11 @@
       "status": "modular-evidence-first",
       "cache_component": "technology",
       "cache_version": 1
+    },
+    "politics": {
+      "status": "diagnostic-deep-probe",
+      "cache_component": null,
+      "cache_version": null
     }
   },
   "presentation": {
@@ -52,9 +57,9 @@
     "scribes_pdf": "direct book-style PDF generated from the same supported chronicle text"
   },
   "historical_event_layer": {
-    "status": "v0.0.45-shared-presentation-source-with-confirmed-leader-deaths",
+    "status": "v0.0.46-shared-presentation-source-with-confirmed-leader-deaths",
     "diagnostic": "diagnostics/Historical_Event_Debug.txt",
-    "purpose": "normalized source/confidence/date-kind events with structured attributes; Timeline and Scribes consume the same synthesized presentation source"
+    "purpose": "normalized source/confidence/date-kind events with structured attributes; Timeline and Scribes consume the same synthesized presentation source. Politics/Diplomacy remains diagnostic-only in v0.0.46."
   },
   "diagnostics": {
     "location": "<campaign archive>/diagnostics",
@@ -71,7 +76,8 @@
       "Raw_Evidence_Probe.txt",
       "Event_Character_Probe_Debug.txt",
       "Notification_Event_Decoder_Debug.txt",
-      "Notification_Death_Evidence_Debug.txt"
+      "Notification_Death_Evidence_Debug.txt",
+      "Politics_Diplomacy_Probe_Debug.txt"
     ],
     "console_path_reporting": true
   },
@@ -140,5 +146,28 @@
       "death_first_observed_date"
     ],
     "rule": "Name/timing promotion is narrowly scoped to retained LEADER_DEATH objects; ordinary notification timing never proves death."
+  },
+  "politics_diplomacy_probe": {
+    "status": "adaptive-raw-structure-probe",
+    "cache_version_change": false,
+    "raw_sample_maximum": 64,
+    "priorities": [
+      "opening save",
+      "latest save",
+      "latest 24 saves",
+      "even historical samples",
+      "known government/profile changes",
+      "known ruler/heir/death milestones"
+    ],
+    "evidence": [
+      "reviewed government/authority/ethics/civics changes",
+      "People-domain ruler/heir/death anchors",
+      "player-country candidate political keys and direct scalar/block values",
+      "government direct scalar fields",
+      "player relations_manager relation records",
+      "relation scalar/block transitions between selected samples",
+      "candidate global election/faction/federation/first-contact marker counts"
+    ],
+    "rule": "Raw keys and values are preserved literally. v0.0.46 does not infer or publish treaties, elections, factions, alliances, rivalries, succession causes or diplomatic outcomes from unfamiliar raw fields."
   }
 }

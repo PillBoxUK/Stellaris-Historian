@@ -113,6 +113,16 @@
 
 # Stellaris Historian Changelog
 
+## v0.0.46
+- Added an evidence-only Politics & Diplomacy Deep Probe.
+- Added `diagnostics/Politics_Diplomacy_Probe_Debug.txt`.
+- Review Campaign now inventories retained player-government fields, candidate political keys, raw relation records and changes between selected raw-save samples.
+- The probe uses all reviewed profile/government states plus adaptive raw-save sampling (maximum 64 raw archives) so mature comparison campaigns are not fully reparsed.
+- Existing People ruler/heir/death milestones are included as cross-domain anchors without inventing election or succession causes.
+- Raw relation keys/blocks are preserved literally; v0.0.46 does not yet infer alliances, treaties, factions, elections, rivalries or diplomatic outcomes from unfamiliar fields.
+- No database schema changes and no parsed-cache component version changes.
+- Review Campaign is required once after installation to generate the new diagnostic.
+
 ## v0.0.36
 - Added a third historical reading surface: **Empire Timeline** (`/timeline`) for a deliberately simple year-by-year chronology.
 - Timeline publication is selective: colony foundations, important leader milestones, named fleet appearances, support/exploration ship commissioning, selected science/archaeology and direct combat evidence can appear; routine trait churn, reinforcements and refit bookkeeping remain in the evidence ledger.
