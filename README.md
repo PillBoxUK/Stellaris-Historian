@@ -6,7 +6,7 @@ It is designed to turn a Stellaris campaign into a living historical archive, tr
 
 ## Current version
 
-v0.0.43
+v0.0.44
 
 ## Features
 

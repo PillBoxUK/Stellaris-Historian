@@ -1,7 +1,7 @@
 {
   "application": "Stellaris Historian",
-  "version": "0.0.43",
-  "architecture": "modular-foundation-18-event-character-deep-probe",
+  "version": "0.0.44",
+  "architecture": "modular-foundation-19-notification-event-object-decoder",
   "managed_roots": [
     "historian",
     "static",
@@ -15,7 +15,7 @@
   ],
   "domains": {
     "people": {
-      "status": "modular-deep-character-evidence-event-probe",
+      "status": "modular-deep-character-notification-event-decoder",
       "cache_component": "leaders",
       "cache_version": 5
     },
@@ -69,20 +69,22 @@
       "Leader_Exit_Evidence_Debug.txt",
       "Character_Evidence_Debug.txt",
       "Raw_Evidence_Probe.txt",
-      "Event_Character_Probe_Debug.txt"
+      "Event_Character_Probe_Debug.txt",
+      "Notification_Event_Decoder_Debug.txt"
     ],
     "console_path_reporting": true
   },
   "character_evidence": {
-    "status": "v0.0.43-event-character-deep-probe",
+    "status": "v0.0.44-notification-event-object-decoder",
     "database_table": "leader_deep_evidence",
     "diagnostics": [
       "diagnostics/Character_Evidence_Debug.txt",
       "diagnostics/Raw_Evidence_Probe.txt",
       "diagnostics/Leader_Exit_Evidence_Debug.txt",
-      "diagnostics/Event_Character_Probe_Debug.txt"
+      "diagnostics/Event_Character_Probe_Debug.txt",
+      "diagnostics/Notification_Event_Decoder_Debug.txt"
     ],
-    "rules": "Raw leader dates/age/background/event-target aliases are preserved without inventing birth, death, dismissal, execution or biography semantics. v0.0.43 adds targeted raw-save windows around leader exits and treats event/notification correlations as candidates only until semantics are proven."
+    "rules": "Raw leader evidence remains conservative. v0.0.44 decodes retained message/notification objects around leader exits and only links a message to a leader when a typed leader reference survives in that message. Notification timing, player_event IDs and generic save_on_death fields never establish death by themselves."
   },
   "event_character_probe": {
     "status": "targeted-raw-window-probe",
@@ -99,5 +101,22 @@
       "delayed_event"
     ],
     "rule": "Correlation never establishes death or exit cause by itself."
+  },
+  "notification_event_decoder": {
+    "status": "targeted-retained-message-object-decoder",
+    "cache_version_change": false,
+    "raw_window": "previous/current/next archived save around each leader exit",
+    "diagnostic": "diagnostics/Notification_Event_Decoder_Debug.txt",
+    "evidence": [
+      "notification allocation gaps",
+      "retained message objects",
+      "message type/localization/date/end",
+      "message variables",
+      "typed targets",
+      "custom_message_text",
+      "player_event selections",
+      "scripted event_id values"
+    ],
+    "rule": "Only explicit typed leader references can directly connect a retained message object to a leader. Missing notification payloads are reported as expired/not retained and are never reconstructed."
   }
 }

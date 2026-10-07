@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.0.44
+- Added targeted decoding of retained Stellaris `message={...}` objects around leader-exit windows.
+- Records notification IDs, message type, localization key, dates, variables, typed targets and retained `custom_message_text`.
+- Reports notification IDs allocated between saves even when their message payload has already expired from the archive.
+- Preserves player-event selection IDs separately from scripted `event_id` values; no unproven mapping is invented.
+- Only explicit typed leader references inside retained message objects can directly connect a message to a leader.
+- Explicitly rejects generic `save_on_death` fields as proof of leader death because the field occurs on unrelated save objects.
+- Reuses People cache v5 and only opens narrow raw-save windows around known leader exits.
+- Adds `Notification_Event_Decoder_Debug.txt`.
+- Review Campaign is required once; Construct Campaign and full cache refresh are not required.
+
+## v0.0.43
+- Added targeted previous/current/next raw-save probing around every reconstructed leader exit.
+- Added `Event_Character_Probe_Debug.txt` with notification/event counter deltas, new player-event IDs, exact-ID saved-event-target blocks and event-adjacent raw leader references.
+- Preserved raw `available_trait`, `cooldown` and `delayed_event` evidence where present.
+- Kept People cache at v5 so the probe does not force a 299-save raw cache rebuild.
+- Event/notification correlations remain non-causal until stronger evidence demonstrates their meaning.
+- Review Campaign is required once; Construct Campaign is not required.
+
 ## v0.0.42
 - Advanced People cache component from v4 to v5 for deep character evidence.
 - Added species, portrait, gender, creator, tier, raw date/date-added/age, ethic, job, background-world, custom-description, bonus-skill, raw-key, flag and variable evidence to leader snapshots.

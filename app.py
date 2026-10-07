@@ -27,6 +27,8 @@ from historian.timeline import render_timeline
 from historian.localisation import write_origin_localisation_debug
 from historian.save_reader import read_campaign_summary, read_empire_profile, valid_stellaris_save
 from historian.watcher import CampaignWatcher
+from historian.domains.people.event_probe import write_event_character_probe
+from historian.domains.people.notification_decoder import write_notification_event_decoder
 
 
 APP_VERSION = __version__
@@ -48,6 +50,36 @@ WATCHER = CampaignWatcher(
 ACTIVE_CAMPAIGN_ID: int | None = None
 server: uvicorn.Server | None = None
 
+
+def _refresh_event_character_probe(campaign_id: int):
+    try:
+        activity("Refreshing Event_Character_Probe_Debug.txt...")
+        path = write_event_character_probe(DB, campaign_id)
+        activity(
+            "Event / character deep probe updated - "
+            f"{path.name}"
+        )
+        return path, None
+    except Exception as exc:
+        message = str(exc)
+        error(f"EVENT / CHARACTER PROBE - {message}")
+        return None, message
+
+
+
+def _refresh_notification_event_decoder(campaign_id: int):
+    try:
+        activity("Refreshing Notification_Event_Decoder_Debug.txt...")
+        path = write_notification_event_decoder(DB, campaign_id)
+        activity(
+            "Notification / event object decoder updated - "
+            f"{path.name}"
+        )
+        return path, None
+    except Exception as exc:
+        message = str(exc)
+        error(f"NOTIFICATION / EVENT DECODER - {message}")
+        return None, message
 
 def safe_name(value: str, max_len: int = 60) -> str:
     value = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", value)
@@ -415,6 +447,14 @@ def api_review_campaign():
         f"Journal rebuilt - {format_duration(time.perf_counter() - journal_started)}"
     )
 
+    event_probe_path, event_probe_error = _refresh_event_character_probe(
+        ACTIVE_CAMPAIGN_ID
+    )
+
+    notification_decoder_path, notification_decoder_error = _refresh_notification_event_decoder(
+        ACTIVE_CAMPAIGN_ID
+    )
+
     diagnostic_path = None
     diagnostic_error = None
 
@@ -554,6 +594,14 @@ def api_construct_campaign():
     activity(
         f"Constructed journal written - "
         f"{format_duration(time.perf_counter() - journal_started)}"
+    )
+
+    event_probe_path, event_probe_error = _refresh_event_character_probe(
+        ACTIVE_CAMPAIGN_ID
+    )
+
+    notification_decoder_path, notification_decoder_error = _refresh_notification_event_decoder(
+        ACTIVE_CAMPAIGN_ID
     )
 
     diagnostic_path = None
