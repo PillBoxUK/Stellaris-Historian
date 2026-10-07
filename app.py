@@ -31,6 +31,7 @@ from historian.domains.people.event_probe import write_event_character_probe
 from historian.domains.people.notification_decoder import write_notification_event_decoder
 from historian.domains.politics.probe import write_politics_diplomacy_probe
 from historian.domains.politics.first_contact_probe import write_first_contact_probe
+from historian.domains.politics.first_contact_history import write_first_contact_history
 
 
 APP_VERSION = __version__
@@ -128,6 +129,10 @@ def _live_history_loop() -> None:
                 result = process_unprocessed(DB, campaign_id)
 
                 if result["processed"]:
+                    _refresh_first_contact_history_for_journal(
+                        campaign_id,
+                        "LIVE HISTORY",
+                    )
                     activity("LIVE HISTORY - refreshing Historical_Journal.html...")
                     journal_started = time.perf_counter()
                     render_journal(DB, campaign_id)
@@ -264,6 +269,41 @@ def _first_contact_probe_refresh(
             )
 
     return write_first_contact_probe(DB, campaign_id, progress=progress)
+
+
+def _first_contact_history_refresh(
+    campaign_id: int,
+    step_index: int,
+    total_steps: int,
+):
+    last_reported = 0
+
+    def progress(done: int, total: int, snapshot: dict) -> None:
+        nonlocal last_reported
+        if done == 1 or done == total or done - last_reported >= 10:
+            last_reported = done
+            activity(
+                f"REFRESH [{step_index:02d}/{total_steps:02d}] "
+                "First_Contact_History_Debug.txt - "
+                f"scanning {done}/{total} - {snapshot.get('game_date', 'unknown date')}"
+            )
+
+    return write_first_contact_history(DB, campaign_id, progress=progress)
+
+
+def _refresh_first_contact_history_for_journal(campaign_id: int, label: str) -> None:
+    try:
+        started = time.perf_counter()
+        write_first_contact_history(DB, campaign_id)
+        activity(
+            f"{label} - structured First Contact history refreshed - "
+            f"{format_duration(time.perf_counter() - started)}"
+        )
+    except Exception as exc:
+        warning(
+            f"{label} - First Contact history refresh failed; "
+            f"journal will continue without new First Contact data: {exc}"
+        )
 
 
 def safe_name(value: str, max_len: int = 60) -> str:
@@ -583,6 +623,11 @@ def api_update_history():
         ACTIVE_CAMPAIGN_ID,
     )
 
+    _refresh_first_contact_history_for_journal(
+        ACTIVE_CAMPAIGN_ID,
+        "UPDATE HISTORY",
+    )
+
     activity(
         "Rendering Historical_Journal.html..."
     )
@@ -714,11 +759,18 @@ def api_review_campaign():
         }
 
     refresh_started = time.perf_counter()
-    refresh_total = 6
+    refresh_total = 7
     activity(f"REFRESH START - {refresh_total} output(s)")
 
-    journal, journal_error = _run_refresh_step(
+    first_contact_history_path, first_contact_history_error = _run_refresh_step(
         1,
+        refresh_total,
+        "First_Contact_History_Debug.txt",
+        lambda: _first_contact_history_refresh(ACTIVE_CAMPAIGN_ID, 1, refresh_total),
+    )
+
+    journal, journal_error = _run_refresh_step(
+        2,
         refresh_total,
         "Historical_Journal.html",
         lambda: render_journal(DB, ACTIVE_CAMPAIGN_ID),
@@ -727,35 +779,35 @@ def api_review_campaign():
         raise HTTPException(500, f"Historical journal refresh failed: {journal_error}")
 
     event_probe_path, event_probe_error = _run_refresh_step(
-        2,
+        3,
         refresh_total,
         "Event_Character_Probe_Debug.txt",
         lambda: write_event_character_probe(DB, ACTIVE_CAMPAIGN_ID),
     )
 
     notification_decoder_path, notification_decoder_error = _run_refresh_step(
-        3,
+        4,
         refresh_total,
         "Notification_Event_Decoder_Debug.txt",
         lambda: write_notification_event_decoder(DB, ACTIVE_CAMPAIGN_ID),
     )
 
     politics_probe_path, politics_probe_error = _run_refresh_step(
-        4,
+        5,
         refresh_total,
         "Politics_Diplomacy_Probe_Debug.txt",
-        lambda: _politics_probe_refresh(ACTIVE_CAMPAIGN_ID, 4, refresh_total),
+        lambda: _politics_probe_refresh(ACTIVE_CAMPAIGN_ID, 5, refresh_total),
     )
 
     first_contact_probe_path, first_contact_probe_error = _run_refresh_step(
-        5,
+        6,
         refresh_total,
         "First_Contact_Probe_Debug.txt",
-        lambda: _first_contact_probe_refresh(ACTIVE_CAMPAIGN_ID, 5, refresh_total),
+        lambda: _first_contact_probe_refresh(ACTIVE_CAMPAIGN_ID, 6, refresh_total),
     )
 
     diagnostic_path, diagnostic_error = _run_refresh_step(
-        6,
+        7,
         refresh_total,
         "Origin_Localisation_Debug.txt",
         lambda: _origin_localisation_refresh(ACTIVE_CAMPAIGN_ID),
@@ -764,6 +816,7 @@ def api_review_campaign():
     refresh_errors = [
         value
         for value in (
+            first_contact_history_error,
             event_probe_error,
             notification_decoder_error,
             politics_probe_error,
@@ -867,11 +920,18 @@ def api_construct_campaign():
         }
 
     refresh_started = time.perf_counter()
-    refresh_total = 6
+    refresh_total = 7
     activity(f"REFRESH START - {refresh_total} output(s)")
 
-    journal, journal_error = _run_refresh_step(
+    first_contact_history_path, first_contact_history_error = _run_refresh_step(
         1,
+        refresh_total,
+        "First_Contact_History_Debug.txt",
+        lambda: _first_contact_history_refresh(ACTIVE_CAMPAIGN_ID, 1, refresh_total),
+    )
+
+    journal, journal_error = _run_refresh_step(
+        2,
         refresh_total,
         "Historical_Journal.html",
         lambda: render_journal(DB, ACTIVE_CAMPAIGN_ID),
@@ -880,35 +940,35 @@ def api_construct_campaign():
         raise HTTPException(500, f"Constructed journal refresh failed: {journal_error}")
 
     event_probe_path, event_probe_error = _run_refresh_step(
-        2,
+        3,
         refresh_total,
         "Event_Character_Probe_Debug.txt",
         lambda: write_event_character_probe(DB, ACTIVE_CAMPAIGN_ID),
     )
 
     notification_decoder_path, notification_decoder_error = _run_refresh_step(
-        3,
+        4,
         refresh_total,
         "Notification_Event_Decoder_Debug.txt",
         lambda: write_notification_event_decoder(DB, ACTIVE_CAMPAIGN_ID),
     )
 
     politics_probe_path, politics_probe_error = _run_refresh_step(
-        4,
+        5,
         refresh_total,
         "Politics_Diplomacy_Probe_Debug.txt",
-        lambda: _politics_probe_refresh(ACTIVE_CAMPAIGN_ID, 4, refresh_total),
+        lambda: _politics_probe_refresh(ACTIVE_CAMPAIGN_ID, 5, refresh_total),
     )
 
     first_contact_probe_path, first_contact_probe_error = _run_refresh_step(
-        5,
+        6,
         refresh_total,
         "First_Contact_Probe_Debug.txt",
-        lambda: _first_contact_probe_refresh(ACTIVE_CAMPAIGN_ID, 5, refresh_total),
+        lambda: _first_contact_probe_refresh(ACTIVE_CAMPAIGN_ID, 6, refresh_total),
     )
 
     diagnostic_path, diagnostic_error = _run_refresh_step(
-        6,
+        7,
         refresh_total,
         "Origin_Localisation_Debug.txt",
         lambda: _origin_localisation_refresh(ACTIVE_CAMPAIGN_ID),
@@ -917,6 +977,7 @@ def api_construct_campaign():
     refresh_errors = [
         value
         for value in (
+            first_contact_history_error,
             event_probe_error,
             notification_decoder_error,
             politics_probe_error,

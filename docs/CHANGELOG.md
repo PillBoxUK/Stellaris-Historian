@@ -1,5 +1,54 @@
 # Changelog
 
+## v0.0.50.4
+- Applies installed Stellaris `adj_NN*` adjective suffix grammar inside generated `%ADJECTIVE%` First Contact country names.
+- Fixes the live contact-91 generated form from `Stellar Hazar Council` to `Stellar Hazaran Council` when the installed `r -> *ran` rule is present.
+- Aligns generated-name substitution with Stellaris one-at-a-time placeholder semantics and cleans leftover numeric continuation placeholders.
+- Restores the First Contact diagnostic owner display from the selected campaign identity when the retained owner ID is the player country.
+- Retains v0.0.50.3 technical-key rejection, `NAME_*` cleanup, nested name grammar, candidate diagnostics and reciprocal completion detection.
+- Updates the expanded README with detailed current-version and code-change notes.
+- No SQLite schema change, parsed-cache version bump, archive rewrite or full cache rebuild.
+
+## v0.0.50.3
+- Adds nested Stellaris `%ADJ%` / `%ADJECTIVE%` country-name grammar needed by generated empire identities.
+- Rejects technical raw keys such as `build_waystation_poi_name`, `gateway_system`, `observing_country`, `this_country` and similar script identifiers before localisation can turn them into misleading public names.
+- Cleans unresolved `NAME_*` country-name tokens with a conservative human-readable fallback when installed localisation does not resolve the key.
+- Continues scanning later cached `relations_manager` names after rejected technical candidates rather than stopping at the first readable localisation.
+- Adds accepted/rejected candidate state, rejection reason, source date and country-name attempts to `First_Contact_History_Debug.txt` / JSON.
+- Keeps reciprocal First Contact completion detection and generic Politics/Diplomacy high-ID filtering unchanged.
+- Replaces the root `README.md` with expanded current-version details, recent development progress, evidence-first rules, generated outputs and known limitations.
+- No SQLite schema change, parsed-cache version bump, archive rewrite or full cache rebuild.
+
+## v0.0.50.2
+- Fixes dynamic First Contact country-name resolution exposed by the Commonwealth contact-91 test.
+- Country identity extraction now reads only top-level country `name`/identity fields, preventing nested government or pre-communications `name` blocks from being mistaken for the empire name.
+- Localises scalar `NAME_*` values before publication, cleaning names such as `NAME_Spaceborne_Organics`.
+- Follows a First Contact counterpart country id into bounded post-contact raw checkpoints and cached `relations_manager` snapshots to find a later revealed diplomatic name without rereading the whole archive.
+- Adds name source/date and top-level identity hints to `First_Contact_History_Debug.txt`.
+- Keeps the v0.0.50.1 two-sided completion evidence rule unchanged.
+- No SQLite schema change, parsed-cache version bump, archive rewrite or full cache rebuild.
+
+## v0.0.50.1
+- Hotfixes structured First Contact resolution after live Commonwealth testing exposed two retained-save edge cases.
+- Renders modern Stellaris templated country names using the saved `name` key, nested `variables` and local localisation instead of publishing a raw template key such as `build_waystation_poi_name`.
+- Checks both completion directions: player `first_contact_completed<counterpart_id>` and reciprocal counterpart `first_contact_completed<player_id>`.
+- Allows directly evidenced First Contact counterparts with dynamic high country IDs when their resolved name is a real diplomatic actor; the broader Politics/Diplomacy pseudo-country filter remains unchanged.
+- Expands `First_Contact_History_Debug.txt` with name-resolution candidates/method and two-sided completion evidence.
+- Keeps response-choice fields diagnostic-only and keeps exact-date rules conservative.
+- No SQLite schema change, parsed-cache version bump, archive rewrite or full cache rebuild.
+
+## v0.0.50
+- Added a structured First Contact decoder that matches leader `first_contact_system` location ids to individual `first_contacts.contacts.<id>` records in retained Stellaris saves.
+- Extracts contact owner, counterpart country, pre-contact designation, location, assigned leader, retained record date, stage/status, event id and saved `contact_country` target evidence.
+- Resolves counterpart country ids to country names from the same retained save state and filters non-diplomatic pseudo actors from public narrative.
+- Promotes a conservative First Contact completion only when the counterpart-specific `first_contact_completed<country_id>` marker first appears across the same archived interval in which the First Contact assignment ends, unless a future direct exact completion field is decoded.
+- Adds `diagnostics/First_Contact_History_Debug.txt` and `diagnostics/First_Contact_History.json`.
+- Adds an evidence-first **First Contact** section to `Historical_Journal.html`.
+- Manual Update History and Live History refresh structured First Contact history before rendering the journal.
+- Review Campaign and Construct Campaign now use 7 refresh steps, with structured First Contact history first so the journal can include it immediately.
+- Response-choice keyword candidates are retained diagnostically but are not published without a proven direct retained selection field.
+- No SQLite schema change, no parsed-cache version bump, and no archived `.sav` changes.
+
 ## v0.0.45
 - Added conservative promotion of retained `LEADER_DEATH` notifications into confirmed People-domain deaths.
 - Promotion requires `MESSAGE_LEADER_LOST_DESC`, a unique exact `LEADER` name match, an unresolved exit in the same archive interval and an exact notification date inside that exit interval.

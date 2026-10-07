@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 chcp 65001 >nul
-title Stellaris Historian v0.0.49
+title Stellaris Historian v0.0.50.4
 
 cls
 if exist "assets\stellaris_banner.txt" (
@@ -15,7 +15,7 @@ if exist "assets\stellaris_banner.txt" (
     echo.
 )
 echo ==========================================
-echo        STELLARIS HISTORIAN v0.0.49
+echo        STELLARIS HISTORIAN v0.0.50.4
 echo ==========================================
 echo.
 
@@ -325,6 +325,81 @@ if not exist "data\.migration_v0_0_49_complete" (
         echo ERROR: v0.0.49 migration failed.
         echo No campaign save data was intentionally deleted.
         echo Check logs\MIGRATION_v0.0.49.log for details.
+        echo.
+        pause
+        exit /b 1
+    )
+    echo.
+)
+
+if not exist "data\.migration_v0_0_50_complete" (
+    echo Running one-time v0.0.50 structured First Contact decoder migration...
+    ".venv\Scripts\python.exe" migrate_v0_0_50.py
+    if errorlevel 1 (
+        echo.
+        echo ERROR: v0.0.50 migration failed.
+        echo No campaign save data was intentionally deleted.
+        echo Check logs\MIGRATION_v0.0.50.log for details.
+        echo.
+        pause
+        exit /b 1
+    )
+    echo.
+)
+
+if not exist "data\.migration_v0_0_50_1_complete" (
+    echo Running one-time v0.0.50.1 First Contact resolution hotfix...
+    ".venv\Scripts\python.exe" migrate_v0_0_50_1.py
+    if errorlevel 1 (
+        echo.
+        echo ERROR: v0.0.50.1 migration failed.
+        echo No campaign save data was intentionally deleted.
+        echo Check logs\MIGRATION_v0.0.50.1.log for details.
+        echo.
+        pause
+        exit /b 1
+    )
+    echo.
+)
+
+if not exist "data\.migration_v0_0_50_2_complete" (
+    echo Running one-time v0.0.50.2 First Contact name-resolution hotfix...
+    ".venv\Scripts\python.exe" migrate_v0_0_50_2.py
+    if errorlevel 1 (
+        echo.
+        echo ERROR: v0.0.50.2 migration failed.
+        echo No campaign save data was intentionally deleted.
+        echo Check logs\MIGRATION_v0.0.50.2.log for details.
+        echo.
+        pause
+        exit /b 1
+    )
+    echo.
+)
+
+if not exist "data\.migration_v0_0_50_3_complete" (
+    echo Running one-time v0.0.50.3 First Contact name-grammar hotfix...
+    ".venv\Scripts\python.exe" migrate_v0_0_50_3.py
+    if errorlevel 1 (
+        echo.
+        echo ERROR: v0.0.50.3 migration failed.
+        echo No campaign save data was intentionally deleted.
+        echo Check logs\MIGRATION_v0.0.50.3.log for details.
+        echo.
+        pause
+        exit /b 1
+    )
+    echo.
+)
+
+if not exist "data\.migration_v0_0_50_4_complete" (
+    echo Running one-time v0.0.50.4 First Contact adjective-inflection hotfix...
+    ".venv\Scripts\python.exe" migrate_v0_0_50_4.py
+    if errorlevel 1 (
+        echo.
+        echo ERROR: v0.0.50.4 migration failed.
+        echo No campaign save data was intentionally deleted.
+        echo Check logs\MIGRATION_v0.0.50.4.log for details.
         echo.
         pause
         exit /b 1

@@ -1,7 +1,7 @@
 {
   "application": "Stellaris Historian",
-  "version": "0.0.49",
-  "architecture": "modular-foundation-24-campaign-navigation-first-contact-probe",
+  "version": "0.0.50.4",
+  "architecture": "modular-foundation-29-first-contact-adjective-inflection",
   "managed_roots": [
     "historian",
     "static",
@@ -79,7 +79,9 @@
       "Notification_Death_Evidence_Debug.txt",
       "Politics_Diplomacy_Probe_Debug.txt",
       "Politics_History_Debug.txt",
-      "First_Contact_Probe_Debug.txt"
+      "First_Contact_Probe_Debug.txt",
+      "First_Contact_History_Debug.txt",
+      "First_Contact_History.json"
     ],
     "console_path_reporting": true
   },
@@ -237,5 +239,17 @@
       "targeted raw first_contact/contact/communications keys and contexts"
     ],
     "rule": "Correlation is diagnostic-only; exact First Contact completion, counterpart and response choice are not published without direct retained evidence."
+  },
+  "first_contact_history": {
+    "status": "structured-decoder-generated-name-adjective-inflection",
+    "cache_version_change": false,
+    "database_schema_change": false,
+    "record_key": "leader.location(type=first_contact_system).id -> first_contacts.contacts.<id>",
+    "counterpart_identity": "contact.country resolved through retained country record and cross-checked with saved_event_target name=contact_country when present",
+    "completion_rule": "Unchanged: player or reciprocal counterpart completion marker must appear across the assignment-end interval unless a direct exact field is decoded.",
+    "response_choice_rule": "Diagnostic-only until a direct retained response selection field is proven.",
+    "journal_section": "First Contact",
+    "name_resolution": "Render nested %ADJ%/%ADJECTIVE% grammar with installed adj_NN* adjective suffix rules; reject technical identifiers; retain candidate audit data.",
+    "high_dynamic_country_ids": "Allowed in First Contact only when the contact record directly identifies the country and its resolved name passes pseudo-actor filtering; generic Politics filter is unchanged."
   }
 }
