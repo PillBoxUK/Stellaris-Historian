@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 chcp 65001 >nul
-title Stellaris Historian v0.0.42
+title Stellaris Historian v0.0.43
 
 cls
 if exist "assets\stellaris_banner.txt" (
@@ -15,7 +15,7 @@ if exist "assets\stellaris_banner.txt" (
     echo.
 )
 echo ==========================================
-echo        STELLARIS HISTORIAN v0.0.42
+echo        STELLARIS HISTORIAN v0.0.43
 echo ==========================================
 echo.
 
@@ -190,6 +190,21 @@ if not exist "data\.migration_v0_0_42_complete" (
         echo ERROR: v0.0.42 migration failed.
         echo No campaign save data was intentionally deleted.
         echo Check logs\MIGRATION_v0.0.42.log for details.
+        echo.
+        pause
+        exit /b 1
+    )
+    echo.
+)
+
+if not exist "data\.migration_v0_0_43_complete" (
+    echo Running one-time v0.0.43 event and character deep-probe validation...
+    ".venv\Scripts\python.exe" migrate_v0_0_43.py
+    if errorlevel 1 (
+        echo.
+        echo ERROR: v0.0.43 migration failed.
+        echo No campaign save data was intentionally deleted.
+        echo Check logs\MIGRATION_v0.0.43.log for details.
         echo.
         pause
         exit /b 1

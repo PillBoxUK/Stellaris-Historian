@@ -6,7 +6,7 @@ It is designed to turn a Stellaris campaign into a living historical archive, tr
 
 ## Current version
 
-v0.0.42
+v0.0.43
 
 ## Features
 
@@ -69,14 +69,14 @@ Your personal `config.json`, save files, logs, databases, backups, and other run
 
 Stellaris Historian is under active development.
 
-The current codebase includes migration and historical tracking work through version 0.0.42.
+The current codebase includes migration and historical tracking work through version 0.0.43.
 
 ## Author
 
 PillBoxUK
 
 
-MPORTANT – PLEASE READ
+IMPORTANT – PLEASE READ
 Stellaris Historian is experimental software and is provided “as is”, without warranty of any kind.
 You download, install and use it entirely at your own risk.
 Please make backups of any Stellaris saves or other data that you consider important before using it.

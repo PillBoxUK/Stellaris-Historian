@@ -1,7 +1,7 @@
 {
   "application": "Stellaris Historian",
-  "version": "0.0.42",
-  "architecture": "modular-foundation-17-character-deep-evidence",
+  "version": "0.0.43",
+  "architecture": "modular-foundation-18-event-character-deep-probe",
   "managed_roots": [
     "historian",
     "static",
@@ -15,7 +15,7 @@
   ],
   "domains": {
     "people": {
-      "status": "modular-deep-character-evidence-death-probe",
+      "status": "modular-deep-character-evidence-event-probe",
       "cache_component": "leaders",
       "cache_version": 5
     },
@@ -68,18 +68,36 @@
       "Combat_Episode_Debug.txt",
       "Leader_Exit_Evidence_Debug.txt",
       "Character_Evidence_Debug.txt",
-      "Raw_Evidence_Probe.txt"
+      "Raw_Evidence_Probe.txt",
+      "Event_Character_Probe_Debug.txt"
     ],
     "console_path_reporting": true
   },
   "character_evidence": {
-    "status": "v0.0.42-deep-evidence",
+    "status": "v0.0.43-event-character-deep-probe",
     "database_table": "leader_deep_evidence",
     "diagnostics": [
       "diagnostics/Character_Evidence_Debug.txt",
       "diagnostics/Raw_Evidence_Probe.txt",
-      "diagnostics/Leader_Exit_Evidence_Debug.txt"
+      "diagnostics/Leader_Exit_Evidence_Debug.txt",
+      "diagnostics/Event_Character_Probe_Debug.txt"
     ],
-    "rules": "Raw leader dates/age/background/event-target aliases are preserved without inventing birth, death, dismissal, execution or biography semantics. Death is promoted only from explicit retained dead-leader evidence."
+    "rules": "Raw leader dates/age/background/event-target aliases are preserved without inventing birth, death, dismissal, execution or biography semantics. v0.0.43 adds targeted raw-save windows around leader exits and treats event/notification correlations as candidates only until semantics are proven."
+  },
+  "event_character_probe": {
+    "status": "targeted-raw-window-probe",
+    "cache_version_change": false,
+    "raw_window": "previous/current/next archived save around each leader exit",
+    "evidence": [
+      "last_notification_id delta",
+      "last_event_id delta",
+      "open_player_event_selection_history IDs",
+      "saved_event_target exact-ID blocks",
+      "event-adjacent leader-ID contexts",
+      "available_trait",
+      "cooldown",
+      "delayed_event"
+    ],
+    "rule": "Correlation never establishes death or exit cause by itself."
   }
 }
