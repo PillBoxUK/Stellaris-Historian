@@ -15,7 +15,7 @@ if exist "assets\stellaris_banner.txt" (
     echo.
 )
 echo ==========================================
-echo        STELLARIS HISTORIAN v0.0.68
+echo        STELLARIS HISTORIAN v0.0.70
 echo ==========================================
 echo.
 
