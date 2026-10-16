@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import time
+import json
 
 from .console import activity, error, format_duration, warning
 from .db import Database
@@ -9,6 +10,7 @@ from .domains.people.history import derive_full_leader_history, leader_transitio
 from .domains.people.notification_deaths import (
     apply_notification_deaths,
     promote_notification_deaths_in_database,
+    historical_notification_deaths,
     write_notification_death_diagnostic,
 )
 from .domains.people.exit_diagnostic import write_leader_exit_diagnostic
@@ -64,6 +66,38 @@ def _diagnostics_dir(archive_dir: Path) -> Path:
     path = Path(archive_dir) / "diagnostics"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _record_performance_sample(archive_dir: Path, sample: dict) -> None:
+    """Append optional, lightweight timings; diagnostic I/O must not break history."""
+    try:
+        path = _diagnostics_dir(archive_dir) / "Processing_Performance.jsonl"
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(sample, ensure_ascii=True, separators=(",", ":")) + "\n")
+    except OSError as exc:
+        warning(f"PERF sample could not be written: {exc}")
+
+
+def _format_parse_timings(timings: dict[str, float], total: float) -> str:
+    order = (
+        ("zip_read", "ZIP"),
+        ("profile", "Profile"),
+        ("ships", "Ships"),
+        ("people", "People"),
+        ("worlds", "Worlds"),
+        ("science", "Science"),
+        ("combat", "Combat"),
+        ("technology", "Tech"),
+        ("politics", "Politics"),
+        ("cache_write", "CacheWrite"),
+    )
+    parts = [
+        f"{label} {format_duration(timings[key])}"
+        for key, label in order
+        if key in timings
+    ]
+    parts.append(f"Total {format_duration(total)}")
+    return " | ".join(parts)
 
 
 def _humanise(raw: str | None) -> str | None:
@@ -177,6 +211,133 @@ def _cache_summary(
     )
 
 
+def refresh_processed_combat_diagnostics(db: Database, campaign_id: int) -> dict:
+    """Synchronize combat diagnostics from processed snapshot cache only.
+
+    This deliberately refuses to reopen raw .sav files.  It exists so Live
+    History / Update History can keep the forensic combat text files current
+    without triggering a full Review Campaign pass or undermining the
+    queue-first performance work added in v0.0.53.
+    """
+    started = time.perf_counter()
+    snapshots = list(db.processed_snapshots(campaign_id))
+    campaign, source_save, cache_dir = _campaign_context(db, campaign_id)
+    ship_fleet_snapshots = []
+    combat_snapshots = []
+    errors: list[str] = []
+
+    for snapshot in snapshots:
+        try:
+            (
+                _profile,
+                ship_snapshot,
+                _leader_snapshot,
+                _world_snapshot,
+                _science_snapshot,
+                combat_snapshot,
+                _technology_snapshot,
+                _politics_snapshot,
+                cache_status,
+            ) = load_or_parse_snapshot(
+                archive_path=Path(snapshot["archive_path"]),
+                source_save=source_save,
+                source_sha256=snapshot["sha256"],
+                snapshot_id=int(snapshot["id"]),
+                cache_dir=cache_dir,
+                cache_only=True,
+            )
+            if cache_status != "hit":
+                raise RuntimeError(
+                    f"expected cache hit, received {cache_status}"
+                )
+            ship_fleet_snapshots.append(ship_snapshot)
+            combat_snapshots.append(combat_snapshot)
+        except Exception as exc:
+            errors.append(f"{snapshot['archive_filename']}: {exc}")
+
+    if errors:
+        warning(
+            "COMBAT DIAGNOSTIC SYNC SKIPPED - "
+            f"{len(errors)} processed snapshot cache error(s). "
+            "Existing diagnostics were left unchanged; run Review Campaign "
+            "if a full cache repair/reparse is required."
+        )
+        for message in errors[:3]:
+            warning(f"COMBAT DIAGNOSTIC SYNC - {message}")
+        if len(errors) > 3:
+            warning(
+                f"COMBAT DIAGNOSTIC SYNC - {len(errors) - 3} additional error(s) omitted."
+            )
+        return {
+            "refreshed": False,
+            "snapshots": len(combat_snapshots),
+            "expected_snapshots": len(snapshots),
+            "errors": errors,
+            "duration_seconds": time.perf_counter() - started,
+        }
+
+    correlated_engagements = derive_correlated_engagements(
+        ship_fleet_snapshots,
+        combat_snapshots,
+    )
+    direct_combat_episodes = derive_direct_combat_episodes(
+        combat_snapshots
+    )
+    combat_episodes = derive_combat_episodes(
+        combat_snapshots,
+        correlated_engagements,
+        direct_combat_episodes,
+    )
+
+    diagnostic_dir = _diagnostics_dir(Path(campaign["archive_dir"]))
+    combat_debug = write_combat_diagnostic(
+        diagnostic_dir,
+        combat_snapshots,
+    )
+    correlation_debug = write_combat_correlation_diagnostic(
+        diagnostic_dir,
+        correlated_engagements,
+        direct_episodes=direct_combat_episodes,
+    )
+    episode_debug = write_combat_episode_diagnostic(
+        diagnostic_dir,
+        combat_episodes,
+    )
+
+    combat_summary = combat_evidence_summary(combat_snapshots)
+    correlation = correlation_summary(correlated_engagements)
+    episode_summary = combat_episode_summary(combat_episodes)
+    latest = combat_snapshots[-1].game_date if combat_snapshots else "none"
+    duration = time.perf_counter() - started
+
+    activity(
+        "COMBAT DIAGNOSTIC SYNC COMPLETE - "
+        f"{len(combat_snapshots)} processed snapshot(s) through {latest} | "
+        f"Wars {combat_summary['wars']} | "
+        f"Formal battles {combat_summary['battles']} | "
+        f"Combat episodes {episode_summary['episodes']} | "
+        f"Correlations {correlation['publishable_engagements']} publishable | "
+        f"{format_duration(duration)}"
+    )
+
+    return {
+        "refreshed": True,
+        "snapshots": len(combat_snapshots),
+        "expected_snapshots": len(snapshots),
+        "latest_game_date": latest,
+        "wars": combat_summary["wars"],
+        "battles": combat_summary["battles"],
+        "episodes": episode_summary["episodes"],
+        "paths": [
+            str(combat_debug),
+            str(correlation_debug),
+            str(episode_debug),
+        ],
+        "errors": [],
+        "duration_seconds": duration,
+    }
+
+
 def process_unprocessed(db: Database, campaign_id: int) -> dict:
     started = time.perf_counter()
 
@@ -209,8 +370,11 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
         )
 
         try:
+            snapshot_started = time.perf_counter()
             snapshot_id = int(snapshot["id"])
 
+            parse_timings: dict[str, float] = {}
+            parse_started = time.perf_counter()
             (
                 profile,
                 current_state,
@@ -227,7 +391,15 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
                 source_sha256=snapshot["sha256"],
                 snapshot_id=snapshot_id,
                 cache_dir=cache_dir,
+                timings=parse_timings,
             )
+            parse_elapsed = time.perf_counter() - parse_started
+            if current_cache_status != "hit":
+                activity(
+                    "         PERF "
+                    f"{current_cache_status.upper()} | "
+                    f"{_format_parse_timings(parse_timings, parse_elapsed)}"
+                )
 
             parsed_in_run[snapshot_id] = (
                 profile,
@@ -317,6 +489,7 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
                         previous_cache_status,
                     )
 
+            delta_started = time.perf_counter()
             ship_fleet_delta = transition_data(
                 previous_state,
                 current_state,
@@ -347,6 +520,7 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
                     f"{snapshot['archive_filename']}: Politics/Diplomacy evidence could not be parsed; core history was retained."
                 )
 
+            delta_elapsed = time.perf_counter() - delta_started
             activity(
                 "         "
                 f"CACHE {current_cache_status.upper()} | "
@@ -368,6 +542,7 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
                 f"Queued builds {len(current_state.build_orders)}"
             )
 
+            persistence_started = time.perf_counter()
             db.add_history_entry(
                 campaign_id=campaign_id,
                 snapshot_id=entry["snapshot_id"],
@@ -418,39 +593,92 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
                     politics_warnings.append(message)
                     error(f"POLITICS / DIPLOMACY - {message}")
 
+            persist_elapsed = time.perf_counter() - persistence_started
+            total_elapsed = time.perf_counter() - snapshot_started
+            activity(
+                "         PERF SAVE | "
+                f"Parse {format_duration(parse_elapsed)} | "
+                f"Transitions {format_duration(delta_elapsed)} | "
+                f"SQL {format_duration(persist_elapsed)} | "
+                f"Total {format_duration(total_elapsed)}"
+            )
+            _record_performance_sample(
+                Path(campaign["archive_dir"]),
+                {
+                    "snapshot_id": snapshot_id,
+                    "date": str(snapshot["game_date"]),
+                    "archive": str(snapshot["archive_filename"]),
+                    "cache": current_cache_status,
+                    "parse_seconds": round(parse_elapsed, 4),
+                    "transitions_seconds": round(delta_elapsed, 4),
+                    "persist_seconds": round(persist_elapsed, 4),
+                    "total_seconds": round(total_elapsed, 4),
+                    "parse_stages": {key: round(value, 4) for key, value in parse_timings.items()},
+                },
+            )
+
         except Exception as exc:
             message = f"{snapshot['archive_filename']}: {exc}"
             errors.append(message)
             error(f"UPDATE HISTORY - {message}")
 
-    try:
-        notification_death_incremental = promote_notification_deaths_in_database(
-            db,
-            campaign_id,
-        )
-        write_notification_death_diagnostic(
-            _diagnostics_dir(Path(campaign["archive_dir"])),
-            notification_death_incremental,
-        )
-        if notification_death_incremental.get("confirmed", 0):
-            activity(
-                "Notification-derived leader deaths promoted - "
-                f"{notification_death_incremental['confirmed']} confirmed"
+    if processed:
+        try:
+            death_started = time.perf_counter()
+            first_id = int(snapshots[0]["id"])
+            boundary = db.previous_snapshot(campaign_id, first_id)
+            audit_boundary_id = int(boundary["id"]) if boundary is not None else None
+            # Old unresolved exits were audited in v0.0.66. If no prior
+            # successful audit exists, or the last audit had archive read
+            # failures, replay the full evidence set instead of skipping any
+            # potentially recoverable historical notification.
+            prior_audit_path = _diagnostics_dir(Path(campaign["archive_dir"])) / "Notification_Death_Evidence_Debug.txt"
+            try:
+                previous_audit = prior_audit_path.read_text(encoding="utf-8")
+                if "Raw archive read failures: 0" not in previous_audit:
+                    audit_boundary_id = None
+            except OSError:
+                audit_boundary_id = None
+            notification_death_incremental = promote_notification_deaths_in_database(
+                db,
+                campaign_id,
+                since_snapshot_id=audit_boundary_id,
             )
-    except Exception as exc:
-        error(f"NOTIFICATION-DERIVED LEADER DEATHS - {exc}")
+            notification_death_incremental["historical_confirmed"] = historical_notification_deaths(
+                db, campaign_id
+            )
+            write_notification_death_diagnostic(
+                _diagnostics_dir(Path(campaign["archive_dir"])),
+                notification_death_incremental,
+            )
+            activity(
+                "PERF DEATH AUDIT | "
+                f"Recent boundary {audit_boundary_id} | "
+                f"Raw reads {notification_death_incremental.get('raw_reads', 0)} | "
+                f"{format_duration(time.perf_counter() - death_started)}"
+            )
+            if notification_death_incremental.get("confirmed", 0):
+                activity(
+                    "Notification-derived leader deaths promoted - "
+                    f"{notification_death_incremental['confirmed']} confirmed"
+                )
+        except Exception as exc:
+            error(f"NOTIFICATION-DERIVED LEADER DEATHS - {exc}")
 
-    try:
-        politics_live_debug = write_politics_database_diagnostic(
-            db,
-            campaign_id,
-        )
-        activity(
-            "Politics / diplomacy structured history updated - "
-            f"diagnostics\\{politics_live_debug.name}"
-        )
-    except Exception as exc:
-        error(f"POLITICS / DIPLOMACY HISTORY DIAGNOSTIC - {exc}")
+    if processed:
+        try:
+            politics_started = time.perf_counter()
+            politics_live_debug = write_politics_database_diagnostic(
+                db,
+                campaign_id,
+            )
+            activity(
+                "Politics / diplomacy structured history updated - "
+                f"diagnostics\\{politics_live_debug.name} - "
+                f"{format_duration(time.perf_counter() - politics_started)}"
+            )
+        except Exception as exc:
+            error(f"POLITICS / DIPLOMACY HISTORY DIAGNOSTIC - {exc}")
 
     remaining = db.unprocessed_count(
         campaign_id
@@ -689,7 +917,7 @@ def review_campaign(db: Database, campaign_id: int) -> dict:
         f"{combat_summary['battles']} formal battles / "
         f"{combat_summary['ship_activity_markers']} ship activity markers / "
         f"{combat_summary['starbase_activity_markers']} starbase activity markers "
-        f"({combat_summary['victories']} formal victories / {combat_summary['defeats']} formal defeats) | "
+        f"({combat_summary['results_under_review']} battle results under review) | "
         f"Technology evidence {technology_summary['opening_technologies']} opening / "
         f"{technology_summary['technology_events']} gained / "
         f"{technology_summary['latest_technologies']} latest | "
@@ -843,6 +1071,7 @@ def review_campaign(db: Database, campaign_id: int) -> dict:
         "combat_battle_count": combat_summary["battles"],
         "combat_victory_count": combat_summary["victories"],
         "combat_defeat_count": combat_summary["defeats"],
+        "combat_results_under_review_count": combat_summary["results_under_review"],
         "combat_ship_activity_marker_count": combat_summary["ship_activity_markers"],
         "combat_starbase_activity_marker_count": combat_summary["starbase_activity_markers"],
         "combat_relation_counterpart_count": combat_summary["relation_counterparts"],
@@ -1114,7 +1343,7 @@ def construct_campaign(
         f"{combat_summary['battles']} formal battles / "
         f"{combat_summary['ship_activity_markers']} ship activity markers / "
         f"{combat_summary['starbase_activity_markers']} starbase activity markers "
-        f"({combat_summary['victories']} formal victories / {combat_summary['defeats']} formal defeats) | "
+        f"({combat_summary['results_under_review']} battle results under review) | "
         f"Technology evidence {technology_summary['opening_technologies']} opening / "
         f"{technology_summary['technology_events']} gained / "
         f"{technology_summary['latest_technologies']} latest | "
@@ -1275,6 +1504,7 @@ def construct_campaign(
         "combat_battle_count": combat_summary["battles"],
         "combat_victory_count": combat_summary["victories"],
         "combat_defeat_count": combat_summary["defeats"],
+        "combat_results_under_review_count": combat_summary["results_under_review"],
         "combat_ship_activity_marker_count": combat_summary["ship_activity_markers"],
         "combat_starbase_activity_marker_count": combat_summary["starbase_activity_markers"],
         "combat_relation_counterpart_count": combat_summary["relation_counterparts"],

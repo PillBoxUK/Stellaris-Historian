@@ -15,42 +15,11 @@ from ...core.stellaris_text import (
 from .models import WorldSnapshot, WorldState
 
 
-def _top_numeric_record(
-    block: str | None,
-    numeric_id: int,
-) -> str | None:
-    """
-    Fetch a direct numeric child from a Paradox block without accidentally
-    matching the same number inside a nested job/pop/building structure.
+from ...core.stellaris_text import _indented_numeric_record
 
-    Stellaris indents direct records consistently within these top-level
-    databases. The first direct numeric record gives us that indentation.
-    """
-    if not block:
-        return None
 
-    first = re.search(
-        r"(?m)^([ \t]*)\d+\s*=\s*\{",
-        block,
-    )
-
-    if not first:
-        return None
-
-    indent = first.group(1)
-
-    match = re.search(
-        rf"(?m)^{re.escape(indent)}{numeric_id}\s*=\s*\{{",
-        block,
-    )
-
-    if not match:
-        return None
-
-    return _extract_braced_after(
-        block,
-        match.start(),
-    )
+def _top_numeric_record(block: str | None, numeric_id: int) -> str | None:
+    return _indented_numeric_record(block, numeric_id)
 
 
 def _normalise_space(value: str) -> str:

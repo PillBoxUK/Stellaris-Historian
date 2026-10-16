@@ -819,8 +819,11 @@ def extract_combat_snapshot(
             defender_country_ids=defenders,
             attacker_war_goal=_goal_name(record, "attacker_war_goal"),
             defender_war_goal=_goal_name(record, "defender_war_goal"),
-            attacker_war_exhaustion=_float_scalar(record, "attacker_war_exhaustion"),
-            defender_war_exhaustion=_float_scalar(record, "defender_war_exhaustion"),
+            # The documented exhaustion keys occur inside individual battle
+            # records in the sampled Stellaris save, not as current war-wide
+            # totals. Never read a nested battle field as a war-level metric.
+            attacker_war_exhaustion=None,
+            defender_war_exhaustion=None,
             battles=war_battles,
         )
         wars[war_id] = state

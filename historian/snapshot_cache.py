@@ -4,7 +4,9 @@ from pathlib import Path
 import json
 import os
 import shutil
+import time
 
+from .core.stellaris_text import indexed_scan_scope
 from .domains.people import CACHE_COMPONENT_NAME as LEADER_COMPONENT_NAME
 from .domains.people import CACHE_COMPONENT_VERSION as LEADER_COMPONENT_VERSION
 from .domains.people.models import LeaderSnapshot
@@ -391,6 +393,8 @@ def load_or_parse_snapshot(
     source_sha256: str,
     snapshot_id: int,
     cache_dir: Path,
+    timings: dict[str, float] | None = None,
+    cache_only: bool = False,
 ) -> tuple[
     EmpireProfile,
     ShipFleetSnapshot,
@@ -411,6 +415,10 @@ def load_or_parse_snapshot(
                components were upgraded and refreshed from one raw save read
       miss   - the cache was missing/invalid and the raw save was fully parsed
     """
+    def mark_timing(name: str, started: float) -> None:
+        if timings is not None:
+            timings[name] = time.perf_counter() - started
+
     archive_path = Path(
         archive_path
     )
@@ -575,94 +583,239 @@ def load_or_parse_snapshot(
             "hit",
         )
 
-    # A valid cache container may contain older component versions. Reuse
-    # the profile and refresh only the parsing components that need current raw
-    # save data. Leaders are refreshed whenever ship/fleet parsing changes
-    # because assignments can depend on the newly parsed ship/fleet state.
-    if profile is not None:
-        _, gamestate = read_save_texts(
-            archive_path
+    if cache_only:
+        raise RuntimeError(
+            "Processed snapshot cache is missing, stale or incomplete; "
+            "diagnostic synchronization refused to reparse the raw save."
         )
 
-        ship_was_refreshed = (
-            ship_snapshot is None
-        )
+    with indexed_scan_scope():
+        # A valid cache container may contain older component versions. Reuse
+        # the profile and refresh only the parsing components that need current raw
+        # save data. Leaders are refreshed whenever ship/fleet parsing changes
+        # because assignments can depend on the newly parsed ship/fleet state.
+        if profile is not None:
+            phase_started = time.perf_counter()
+            _, gamestate = read_save_texts(
+                archive_path
+            )
+            mark_timing("zip_read", phase_started)
 
-        if ship_snapshot is None:
-            ship_snapshot = extract_ship_fleet_snapshot(
-                archive_path,
-                source_save=source_save,
-                snapshot_id=snapshot_id,
-                profile=profile,
-                gamestate=gamestate,
+            ship_was_refreshed = (
+                ship_snapshot is None
             )
 
-        if (
-            leader_snapshot is None
-            or ship_was_refreshed
-        ):
-            leader_snapshot = extract_leader_snapshot(
-                gamestate=gamestate,
-                profile=profile,
-                source_save=source_save,
-                snapshot_id=snapshot_id,
-                ship_snapshot=ship_snapshot,
-            )
+            if ship_snapshot is None:
+                phase_started = time.perf_counter()
+                ship_snapshot = extract_ship_fleet_snapshot(
+                    archive_path,
+                    source_save=source_save,
+                    snapshot_id=snapshot_id,
+                    profile=profile,
+                    gamestate=gamestate,
+                )
+                mark_timing("ships", phase_started)
 
-        if world_snapshot is None:
-            world_snapshot = extract_world_snapshot(
-                gamestate=gamestate,
-                profile=profile,
-                source_save=source_save,
-                snapshot_id=snapshot_id,
-                leader_names={
-                    leader_id: leader.name
-                    for leader_id, leader in leader_snapshot.leaders.items()
-                },
-            )
-
-        if science_snapshot is None:
-            science_snapshot = extract_science_snapshot(
-                gamestate=gamestate,
-                profile=profile,
-                source_save=source_save,
-                snapshot_id=snapshot_id,
-                ship_snapshot=ship_snapshot,
-                leader_snapshot=leader_snapshot,
-            )
-
-        if combat_snapshot is None:
-            combat_snapshot = extract_combat_snapshot(
-                gamestate=gamestate,
-                profile=profile,
-                source_save=source_save,
-                snapshot_id=snapshot_id,
-                ship_snapshot=ship_snapshot,
-            )
-
-        if technology_snapshot is None:
-            technology_snapshot = extract_technology_snapshot(
-                gamestate=gamestate,
-                profile=profile,
-                source_save=source_save,
-                snapshot_id=snapshot_id,
-            )
-
-        if politics_snapshot is None:
-            try:
-                politics_snapshot = extract_politics_snapshot(
+            if (
+                leader_snapshot is None
+                or ship_was_refreshed
+            ):
+                phase_started = time.perf_counter()
+                leader_snapshot = extract_leader_snapshot(
                     gamestate=gamestate,
                     profile=profile,
                     source_save=source_save,
                     snapshot_id=snapshot_id,
+                    ship_snapshot=ship_snapshot,
+                )
+                mark_timing("people", phase_started)
+
+            if world_snapshot is None:
+                phase_started = time.perf_counter()
+                world_snapshot = extract_world_snapshot(
+                    gamestate=gamestate,
+                    profile=profile,
+                    source_save=source_save,
+                    snapshot_id=snapshot_id,
+                    leader_names={
+                        leader_id: leader.name
+                        for leader_id, leader in leader_snapshot.leaders.items()
+                    },
+                )
+                mark_timing("worlds", phase_started)
+
+            if science_snapshot is None:
+                phase_started = time.perf_counter()
+                science_snapshot = extract_science_snapshot(
+                    gamestate=gamestate,
+                    profile=profile,
+                    source_save=source_save,
+                    snapshot_id=snapshot_id,
+                    ship_snapshot=ship_snapshot,
                     leader_snapshot=leader_snapshot,
                 )
-            except Exception:
-                # Politics/Diplomacy is an additive evidence domain.  A parser
-                # problem must never invalidate the already supported history
-                # components or force the same save through Update History again.
-                politics_snapshot = None
+                mark_timing("science", phase_started)
 
+            if combat_snapshot is None:
+                phase_started = time.perf_counter()
+                combat_snapshot = extract_combat_snapshot(
+                    gamestate=gamestate,
+                    profile=profile,
+                    source_save=source_save,
+                    snapshot_id=snapshot_id,
+                    ship_snapshot=ship_snapshot,
+                )
+                mark_timing("combat", phase_started)
+
+            if technology_snapshot is None:
+                phase_started = time.perf_counter()
+                technology_snapshot = extract_technology_snapshot(
+                    gamestate=gamestate,
+                    profile=profile,
+                    source_save=source_save,
+                    snapshot_id=snapshot_id,
+                )
+                mark_timing("technology", phase_started)
+
+            if politics_snapshot is None:
+                phase_started = time.perf_counter()
+                try:
+                    politics_snapshot = extract_politics_snapshot(
+                        gamestate=gamestate,
+                        profile=profile,
+                        source_save=source_save,
+                        snapshot_id=snapshot_id,
+                        leader_snapshot=leader_snapshot,
+                    )
+                except Exception:
+                    # Politics/Diplomacy is an additive evidence domain.  A parser
+                    # problem must never invalidate the already supported history
+                    # components or force the same save through Update History again.
+                    politics_snapshot = None
+                finally:
+                    mark_timing("politics", phase_started)
+
+            phase_started = time.perf_counter()
+            _write(
+                path,
+                source_sha256=source_sha256,
+                size=size,
+                mtime_ns=mtime_ns,
+                profile=profile,
+                ship_snapshot=ship_snapshot,
+                leader_snapshot=leader_snapshot,
+                world_snapshot=world_snapshot,
+                science_snapshot=science_snapshot,
+                combat_snapshot=combat_snapshot,
+                technology_snapshot=technology_snapshot,
+                politics_snapshot=politics_snapshot,
+            )
+            mark_timing("cache_write", phase_started)
+
+            return (
+                profile,
+                ship_snapshot,
+                leader_snapshot,
+                world_snapshot,
+                science_snapshot,
+                combat_snapshot,
+                technology_snapshot,
+                politics_snapshot,
+                "extend",
+            )
+
+        # Full miss. One ZIP read is shared by all current parsers.
+        phase_started = time.perf_counter()
+        meta, gamestate = read_save_texts(
+            archive_path
+        )
+        mark_timing("zip_read", phase_started)
+
+        phase_started = time.perf_counter()
+        profile = empire_profile_from_text(
+            meta,
+            gamestate,
+        )
+        mark_timing("profile", phase_started)
+
+        phase_started = time.perf_counter()
+        ship_snapshot = extract_ship_fleet_snapshot(
+            archive_path,
+            source_save=source_save,
+            snapshot_id=snapshot_id,
+            profile=profile,
+            gamestate=gamestate,
+        )
+        mark_timing("ships", phase_started)
+
+        phase_started = time.perf_counter()
+        leader_snapshot = extract_leader_snapshot(
+            gamestate=gamestate,
+            profile=profile,
+            source_save=source_save,
+            snapshot_id=snapshot_id,
+            ship_snapshot=ship_snapshot,
+        )
+        mark_timing("people", phase_started)
+
+        phase_started = time.perf_counter()
+        world_snapshot = extract_world_snapshot(
+            gamestate=gamestate,
+            profile=profile,
+            source_save=source_save,
+            snapshot_id=snapshot_id,
+            leader_names={
+                leader_id: leader.name
+                for leader_id, leader in leader_snapshot.leaders.items()
+            },
+        )
+        mark_timing("worlds", phase_started)
+
+        phase_started = time.perf_counter()
+        science_snapshot = extract_science_snapshot(
+            gamestate=gamestate,
+            profile=profile,
+            source_save=source_save,
+            snapshot_id=snapshot_id,
+            ship_snapshot=ship_snapshot,
+            leader_snapshot=leader_snapshot,
+        )
+        mark_timing("science", phase_started)
+
+        phase_started = time.perf_counter()
+        combat_snapshot = extract_combat_snapshot(
+            gamestate=gamestate,
+            profile=profile,
+            source_save=source_save,
+            snapshot_id=snapshot_id,
+            ship_snapshot=ship_snapshot,
+        )
+        mark_timing("combat", phase_started)
+
+        phase_started = time.perf_counter()
+        technology_snapshot = extract_technology_snapshot(
+            gamestate=gamestate,
+            profile=profile,
+            source_save=source_save,
+            snapshot_id=snapshot_id,
+        )
+        mark_timing("technology", phase_started)
+
+        phase_started = time.perf_counter()
+        try:
+            politics_snapshot = extract_politics_snapshot(
+                gamestate=gamestate,
+                profile=profile,
+                source_save=source_save,
+                snapshot_id=snapshot_id,
+                leader_snapshot=leader_snapshot,
+            )
+        except Exception:
+            politics_snapshot = None
+        finally:
+            mark_timing("politics", phase_started)
+
+        phase_started = time.perf_counter()
         _write(
             path,
             source_sha256=source_sha256,
@@ -677,6 +830,7 @@ def load_or_parse_snapshot(
             technology_snapshot=technology_snapshot,
             politics_snapshot=politics_snapshot,
         )
+        mark_timing("cache_write", phase_started)
 
         return (
             profile,
@@ -687,104 +841,5 @@ def load_or_parse_snapshot(
             combat_snapshot,
             technology_snapshot,
             politics_snapshot,
-            "extend",
+            "miss",
         )
-
-    # Full miss. One ZIP read is shared by all current parsers.
-    meta, gamestate = read_save_texts(
-        archive_path
-    )
-
-    profile = empire_profile_from_text(
-        meta,
-        gamestate,
-    )
-
-    ship_snapshot = extract_ship_fleet_snapshot(
-        archive_path,
-        source_save=source_save,
-        snapshot_id=snapshot_id,
-        profile=profile,
-        gamestate=gamestate,
-    )
-
-    leader_snapshot = extract_leader_snapshot(
-        gamestate=gamestate,
-        profile=profile,
-        source_save=source_save,
-        snapshot_id=snapshot_id,
-        ship_snapshot=ship_snapshot,
-    )
-
-    world_snapshot = extract_world_snapshot(
-        gamestate=gamestate,
-        profile=profile,
-        source_save=source_save,
-        snapshot_id=snapshot_id,
-        leader_names={
-            leader_id: leader.name
-            for leader_id, leader in leader_snapshot.leaders.items()
-        },
-    )
-
-    science_snapshot = extract_science_snapshot(
-        gamestate=gamestate,
-        profile=profile,
-        source_save=source_save,
-        snapshot_id=snapshot_id,
-        ship_snapshot=ship_snapshot,
-        leader_snapshot=leader_snapshot,
-    )
-
-    combat_snapshot = extract_combat_snapshot(
-        gamestate=gamestate,
-        profile=profile,
-        source_save=source_save,
-        snapshot_id=snapshot_id,
-        ship_snapshot=ship_snapshot,
-    )
-
-    technology_snapshot = extract_technology_snapshot(
-        gamestate=gamestate,
-        profile=profile,
-        source_save=source_save,
-        snapshot_id=snapshot_id,
-    )
-
-    try:
-        politics_snapshot = extract_politics_snapshot(
-            gamestate=gamestate,
-            profile=profile,
-            source_save=source_save,
-            snapshot_id=snapshot_id,
-            leader_snapshot=leader_snapshot,
-        )
-    except Exception:
-        politics_snapshot = None
-
-    _write(
-        path,
-        source_sha256=source_sha256,
-        size=size,
-        mtime_ns=mtime_ns,
-        profile=profile,
-        ship_snapshot=ship_snapshot,
-        leader_snapshot=leader_snapshot,
-        world_snapshot=world_snapshot,
-        science_snapshot=science_snapshot,
-        combat_snapshot=combat_snapshot,
-        technology_snapshot=technology_snapshot,
-        politics_snapshot=politics_snapshot,
-    )
-
-    return (
-        profile,
-        ship_snapshot,
-        leader_snapshot,
-        world_snapshot,
-        science_snapshot,
-        combat_snapshot,
-        technology_snapshot,
-        politics_snapshot,
-        "miss",
-    )

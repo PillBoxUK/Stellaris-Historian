@@ -361,14 +361,31 @@ def apply_notification_deaths(
     return result
 
 
-def promote_notification_deaths_in_database(db, campaign_id: int) -> dict:
-    """Apply the same promotion after incremental Update History processing."""
+def promote_notification_deaths_in_database(
+    db, campaign_id: int, *, since_snapshot_id: int | None = None,
+) -> dict:
+    """Apply verified death notifications without reopening irrelevant old saves.
+
+    A retained death notification may be found in the exiting snapshot OR
+    its immediate successor. An incremental run therefore rechecks exits in
+    the last processed boundary snapshot and all newly processed snapshots.
+    The default (None) remains a full historical audit.
+    """
     snapshot_rows = list(db.all_snapshots(campaign_id))
     leader_history = {
         "leaders": [dict(row) for row in db.leader_registry(campaign_id)],
         "events": [dict(row) for row in db.leader_career_events(campaign_id, visible_only=False)],
     }
+    if since_snapshot_id is not None:
+        leader_history["events"] = [
+            event for event in leader_history["events"]
+            if event.get("event_type") in _UNRESOLVED_EXIT_TYPES
+            and int(event.get("snapshot_id") or -1) >= int(since_snapshot_id)
+        ]
     result = apply_notification_deaths(snapshot_rows, leader_history)
+    result["audit_scope"] = (
+        "recent-exit-boundaries" if since_snapshot_id is not None else "all-unresolved-exits"
+    )
     promotions = result.get("promotions", [])
     if not promotions:
         return result
@@ -443,6 +460,33 @@ def promote_notification_deaths_in_database(db, campaign_id: int) -> dict:
     return result
 
 
+def historical_notification_deaths(db, campaign_id: int) -> list[dict]:
+    """Read already-established notification deaths without replaying raw saves.
+
+    A prior incremental pass has already replaced the unresolved exit event in
+    SQLite. Subsequent passes naturally find zero *new* promotions; they must
+    not make the diagnostic appear to have forgotten the old confirmations.
+    """
+    names = {int(row["leader_id"]): str(row["name"])
+             for row in db.leader_registry(campaign_id)}
+    confirmed = []
+    for row in db.leader_deep_evidence(campaign_id):
+        if row["death_evidence_kind"] != "notification_leader_death_named":
+            continue
+        if not row["death_date"]:
+            continue
+        leader_id = int(row["leader_id"])
+        confirmed.append({
+            "leader_id": leader_id,
+            "leader_name": names.get(leader_id, f"Leader {leader_id}"),
+            "death_date": str(row["death_date"]),
+            "first_absent_date": row["death_first_observed_date"],
+            "reason": row["death_reason_value"],
+            "evidence_kind": str(row["death_evidence_kind"]),
+        })
+    return sorted(confirmed, key=lambda r: (r["death_date"], r["leader_id"]))
+
+
 def write_notification_death_diagnostic(
     archive_dir: Path,
     result: dict,
@@ -454,14 +498,21 @@ def write_notification_death_diagnostic(
     rejected = result.get("rejected", [])
     raw_errors = result.get("raw_errors", {})
 
+    historical = result.get("historical_confirmed")
+    if historical is not None:
+        historical = list(historical)
+
     lines = [
         "STELLARIS HISTORIAN - NOTIFICATION-DERIVED LEADER DEATH EVIDENCE",
         "",
         "Purpose: promote only validated retained LEADER_DEATH notifications into confirmed leader history.",
         "A named death is accepted only when the retained message is LEADER_DEATH / MESSAGE_LEADER_LOST_DESC, the LEADER variable uniquely matches one known player leader, that leader exits in the same archive interval, and the notification date lies inside that exit interval.",
         "",
-        f"Confirmed notification-derived deaths: {len(promotions)}",
-        f"Rejected/ambiguous death-message candidates: {len(rejected)}",
+        (f"Confirmed historical notification-derived deaths in SQLite: {len(historical)}"
+         if historical is not None else
+         f"Confirmed notification-derived deaths in this full review: {len(promotions)}"),
+        f"Newly promoted deaths in this pass: {len(promotions)}",
+        f"Rejected/ambiguous death-message candidates in this pass: {len(rejected)}",
         f"Unique raw archive saves opened: {result.get('raw_reads', 0)}",
         f"Raw archive read failures: {len(raw_errors)}",
         "",
@@ -469,8 +520,23 @@ def write_notification_death_diagnostic(
         "=========",
     ]
 
+    if historical is not None:
+        # SQLite is authoritative for deaths confirmed by previous Update
+        # History passes. Original message IDs may not be stored on the deep
+        # evidence record, so they are not fabricated here.
+        if not historical:
+            lines.append("None established in SQLite")
+        for item in historical:
+            lines.extend([
+                f"{item['death_date']} | {item['leader_name']} | Leader ID {item['leader_id']}",
+                f"  Evidence: {item['evidence_kind']}",
+                f"  Reason/custom text: {item.get('reason') or 'Not recorded'}",
+                f"  First archived state after death: {item.get('first_absent_date') or 'Not recorded'}",
+                "",
+            ])
+        lines.extend(["", "NEW CONFIRMATIONS IN THIS PASS", "=============================="])
     if not promotions:
-        lines.append("None")
+        lines.append("None (previous confirmations remain in the historical register)" if historical is not None else "None")
     for item in promotions:
         lines.extend([
             f"{item['death_date']} | {item['leader_name']} | Leader ID {item['leader_id']}",

@@ -1,7 +1,7 @@
 {
   "application": "Stellaris Historian",
-  "version": "0.0.50.4",
-  "architecture": "modular-foundation-29-first-contact-adjective-inflection",
+  "version": "0.0.70",
+  "architecture": "military-chronicle-navigation-research-evidence-dossier-export",
   "managed_roots": [
     "historian",
     "static",
@@ -11,7 +11,8 @@
     ".venv",
     "data",
     "backups",
-    "Updates and source"
+    "Updates and source",
+    "autobackups"
   ],
   "domains": {
     "people": {
@@ -35,7 +36,7 @@
       "cache_version": 1
     },
     "combat": {
-      "status": "direct-telemetry-correlation-episode-synthesis",
+      "status": "direct-telemetry-correlation-episode-synthesis-with-archive-boundary-territorial-analysis",
       "cache_component": "combat",
       "cache_version": 3
     },
@@ -54,7 +55,8 @@
     "historical_journal": "evidence-led technical ledger",
     "scribes_view": "deterministic in-universe chronicle using synthesized combat episodes; granular evidence remains in the journal/diagnostics",
     "empire_timeline": "selective chronology rendered from the shared Historical Event Layer, including major combat episodes and technology milestones",
-    "scribes_pdf": "direct book-style PDF generated from the same supported chronicle text"
+    "scribes_pdf": "direct book-style PDF generated from the same supported chronicle text",
+    "war_journal": "v0.0.70 war index and direct war-ID links, two-ended prev/next navigation, evidence chronology and annual battles, cached first-observed wartime technology, selective theatre filters, printable/shareable text briefs, collapsible forensic tables; v0.0.69 victory and exhaustion provenance preserved"
   },
   "historical_event_layer": {
     "status": "v0.0.47-shared-presentation-source-with-structured-politics-diplomacy",
@@ -81,7 +83,8 @@
       "Politics_History_Debug.txt",
       "First_Contact_Probe_Debug.txt",
       "First_Contact_History_Debug.txt",
-      "First_Contact_History.json"
+      "First_Contact_History.json",
+      "Processing_Performance.jsonl"
     ],
     "console_path_reporting": true
   },
@@ -251,5 +254,66 @@
     "journal_section": "First Contact",
     "name_resolution": "Render nested %ADJ%/%ADJECTIVE% grammar with installed adj_NN* adjective suffix rules; reject technical identifiers; retain candidate audit data.",
     "high_dynamic_country_ids": "Allowed in First Contact only when the contact record directly identifies the country and its resolved name passes pseudo-actor filtering; generic Politics filter is unchanged."
+  },
+  "console_workflow": {
+    "status": "manual-operation-completion-banner",
+    "success_banner": "ALL UPDATES ARE COMPLETED",
+    "error_banner": "PROCESS COMPLETED WITH ERRORS",
+    "manual_operations": [
+      "Update History",
+      "Review Campaign",
+      "Construct Campaign"
+    ],
+    "live_history_banner_suppressed": true,
+    "cache_version_change": false,
+    "database_schema_change": false
+  },
+  "war_journal": {
+    "status": "evidence-led-foundation",
+    "path": "<campaign archive>/War_Journal.html",
+    "route": "/war-journal",
+    "source": "shared presentation history and reviewed combat cache",
+    "formal_wars_separate_from_combat_episodes": true,
+    "formal_outcome_requires_formal_battle_evidence": true,
+    "raw_save_reparse": false,
+    "cache_version_change": false,
+    "database_schema_change": false,
+    "outcome_audit": "unverified tactical attacker_victory flag exposed, no speculative global inversion"
+  },
+  "live_history_performance": {
+    "status": "queue-first-with-parser-timing-telemetry",
+    "history_queue_priority": true,
+    "presentation_refresh_deferred_while_unprocessed": true,
+    "first_contact_processed_snapshots_only": true,
+    "per_domain_cache_miss_timing": true,
+    "database_schema_change": false,
+    "cache_version_change": false
+  },
+  "combat_diagnostic_sync": {
+    "status": "active-cache-only-after-history-catch-up",
+    "outputs": [
+      "diagnostics/Combat_Evidence_Debug.txt",
+      "diagnostics/Combat_Correlation_Debug.txt",
+      "diagnostics/Combat_Episode_Debug.txt"
+    ],
+    "snapshot_scope": "processed snapshots only",
+    "manual_update_runs_with_zero_new_saves": true,
+    "live_history_runs_after_queue_zero": true,
+    "raw_save_fallback": false,
+    "cache_version_change": false,
+    "database_schema_change": false
+  },
+  "presentation_history": {
+    "snapshot_scope": "processed snapshots only"
+  },
+  "performance": {
+    "focus": "save-scoped indexed Paradox block/numeric lookups, single-pass brace scanning, parser performance parity, corrected historical death audit",
+    "parser_index": "temporary in-memory context for one raw save decode; automatically discarded on completion or error",
+    "cache_versions_unchanged": true,
+    "sqlite_schema_unchanged": true,
+    "original_saves_unchanged": true,
+    "ai_evidence_preserved": true,
+    "baseline_fixture": "ironman-311.sav: v0.0.65 71.84s -> v0.0.66 8.40s; identical serialized 8 evidence domains",
+    "metrics": "<campaign archive>/diagnostics/Processing_Performance.jsonl"
   }
 }

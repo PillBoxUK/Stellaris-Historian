@@ -37,10 +37,10 @@ from .domains.technology.cache import snapshot_from_dict as technology_snapshot_
 class PresentationHistory:
     """Shared evidence bundle consumed by polished presentation views.
 
-    Review Campaign remains the evidence-building step. Timeline and Scribes read
-    only the database plus already-populated snapshot-cache components and then
-    synthesize the same Historical Event Layer in memory. Neither renderer
-    reparses Ironman saves or mutates campaign evidence.
+    Review Campaign remains the deepest evidence-building step. Timeline,
+    Scribes and the War Journal read only the database plus already-populated
+    cache components for snapshots that completed normal History processing.
+    None of these renderers reparses Ironman saves or mutates campaign evidence.
     """
 
     events: tuple[HistoricalEvent, ...]
@@ -82,7 +82,7 @@ def _cached_component_snapshots(
         return []
 
     result: list = []
-    for snapshot in db.all_snapshots(campaign_id):
+    for snapshot in db.processed_snapshots(campaign_id):
         path = cache_dir / f"{snapshot['sha256']}.json"
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))

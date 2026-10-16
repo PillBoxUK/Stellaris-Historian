@@ -565,6 +565,19 @@ class Database:
                 (campaign_id,),
             ).fetchall()
 
+    def processed_snapshots(self, campaign_id: int):
+        """Return only snapshots that completed normal History processing."""
+        with self.connect() as con:
+            return con.execute(
+                """
+                SELECT *
+                FROM snapshots
+                WHERE campaign_id=? AND processed=1
+                ORDER BY id ASC
+                """,
+                (campaign_id,),
+            ).fetchall()
+
     def previous_snapshot(self, campaign_id: int, snapshot_id: int):
         with self.connect() as con:
             return con.execute(

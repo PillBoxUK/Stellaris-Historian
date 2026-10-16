@@ -863,13 +863,7 @@ def _combat_chapter(historical_events: list[HistoricalEvent] | tuple[HistoricalE
             else:
                 detail += " The surviving retained fleet tallies record no vessel losses for either side."
 
-        outcome = attrs.get("formal_outcome")
-        if outcome == "victory":
-            detail += " A surviving formal battle-roll establishes victory."
-        elif outcome == "defeat":
-            detail += " A surviving formal battle-roll establishes defeat."
-        else:
-            detail += " No surviving record establishes victory or defeat."
+        detail += " Formal battle results remain under review; no player victory or defeat is established."
         paragraphs.append(detail)
 
     if resolved_events:

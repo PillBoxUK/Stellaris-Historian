@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.0.70
+- Adds chronological war index with direct `#war-ID` bookmarks and named previous/next war navigation at both the top and bottom of each report. First and last wars have appropriately unavailable directions; bracket keys can navigate outside input controls.
+- Builds an evidence-only war chronicle from the native start date, observed first/last formal battle dates, archived war presence, first absent snapshot, and source-scoped screenshot-confirmed victory notifications. Never replaces observed intervals with guessed exact peace execution days.
+- Adds a year-by-year battle ledger grouped from retained dated formal battle records, preserving incomplete casualty fields, and a clearly labelled list of largest recorded losses without attributing causes or outcomes.
+- Adds theatre-to-battle filters and reset controls. Long per-war battle tables and on-demand starbase/ground investigation grids are expandable to prevent excessively long scrolling.
+- Adds Copy War Brief and Save War Brief (.txt) using local client-side controls. Text includes sourced war facts, chronicle milestones, observed research and explicit evidence caveats; no cloud upload.
+- Shows completed technologies first observed within each war's archived observation window using already-loaded technology snapshots. Quarterly intervals remain distinct from exact completion days; active research choices and causal connections to war are never inferred.
+- Fixes an event-handler overlap: the territorial aftermath handler no longer attempts to process military-investigation button clicks.
+- No changes to SQLite schema, archived `.sav`, parsed cache versions, military forensic sources, Live History performance pipeline, GitHub or migration logic.
+
+## v0.0.69
+- Adds narrowly scoped user-screenshot victory notification evidence for Commonwealth v. Hulfiran (2300.08.15) and Commonwealth v. Silicron Interface (2303.02.14). These are screenshot-observed notifications, not reconstructed exact treaty execution times.
+- Shows verified screenshot victory information beside the independently established save-to-save war-ending interval; never assumes every possible peace term from control changes.
+- Replaces confusing `Not retained` war-exhaustion display with explicit `Not verified from archived war` and new on-demand raw per-battle exhaustion-field evidence; no invented war-wide totals.
+- Moves on-demand military investigation into a single background job per campaign/war with browser polling of completed/total snapshots, current date, archive cache hits, v0.0.68 index reuse and raw reads.
+- Reuses already-generated v0.0.68 military projection cache safely, extracting only the new battle-local fields; existing v1 evidence is preserved, and derived v2 caches are atomic and regenerable.
+- Prevents duplicate investigations while running and invalidates the in-process completed result when additional processed archives arrive.
+- No SQLite schema change, `.sav` modification, normal snapshot cache revision or Live History workflow change. Technology completions remain tracked normally; active research choices are not newly inferred by this patch.
+
+
+## v0.0.54
+- Fixes stale combat diagnostics after incremental Update History / Live History processing.
+- Adds a cache-only synchronization pass for `Combat_Evidence_Debug.txt`, `Combat_Correlation_Debug.txt` and `Combat_Episode_Debug.txt` once the normal History queue reaches zero.
+- Synchronization consumes processed snapshots only and refuses to reopen raw `.sav` files; if a processed cache is missing/stale, existing diagnostics are preserved and Review Campaign is recommended.
+- Manual Update History can synchronize the combat diagnostics even when zero new saves are waiting.
+- Live History retains v0.0.53 queue-first scheduling and runs the diagnostic sync only after catch-up.
+- War Journal, Timeline and Scribes cached evidence readers now ignore archived-but-unprocessed snapshots.
+- No SQLite schema change, parsed-cache component version bump, archived-save rewrite or processed-flag reset.
+
+## v0.0.53
+- Makes Live History queue-first: when newly archived saves remain unprocessed, Historian immediately continues History processing instead of rebuilding First Contact history and the Historical Journal between batches.
+- Adds a second queue check before expensive presentation refreshes so a newly arrived save gets priority over journal work.
+- Restricts structured First Contact rebuilding to snapshots that have completed normal History processing, preventing the First Contact stage from parsing waiting saves ahead of the History queue.
+- Adds per-domain timing telemetry for cache misses/extensions (`ZIP`, `Profile`, `Ships`, `People`, `Worlds`, `Science`, `Combat`, `Tech`, `Politics`, `CacheWrite`) so the next optimisation pass can target the real parser bottleneck.
+- Adds processed/ignored snapshot counts to the First Contact diagnostic.
+- No SQLite schema change, parsed-cache version bump, archived-save rewrite or full cache rebuild.
+
+## v0.0.52
+- Adds a dedicated evidence-led `War_Journal.html` generated from existing reviewed combat cache data.
+- Adds a War Journal control to the active-campaign dashboard and a local `/war-journal` render route.
+- Keeps retained formal wars separate from reconstructed combat episodes so fauna/guardian fighting is not silently promoted into a diplomatic war.
+- Formal-war cards preserve retained start/observation windows, player side, war goals, latest exhaustion values and direct player battle rows.
+- Combat-episode cards preserve systems, opposing forces, fleets, commanders, direct retained loss telemetry and possible-but-unconfirmed loss identities.
+- Formal victory/defeat is published only where retained formal battle evidence establishes it.
+- The renderer reads the shared presentation layer and snapshot cache; it does not silently reparse Ironman saves.
+- No SQLite schema, parsed-cache component version, archived-save or processed-flag changes.
+
+## v0.0.51
+- Adds an unmistakable final `ALL UPDATES ARE COMPLETED` banner after successful manual Update History, Review Campaign and Construct Campaign workflows.
+- Prints `PROCESS COMPLETED WITH ERRORS` when the active manual workflow logged errors, including Review/Construct refresh failures.
+- Tracks manual workflow boundaries inside the console logger so the banner appears only after the operation's final journal/refresh step.
+- Suppresses completion banners for automatic Live History cycles to avoid repetitive console spam during normal play.
+- No SQLite schema, parsed-cache, archived-save or processed-flag changes.
+
 ## v0.0.50.4
 - Applies installed Stellaris `adj_NN*` adjective suffix grammar inside generated `%ADJECTIVE%` First Contact country names.
 - Fixes the live contact-91 generated form from `Stellar Hazar Council` to `Stellar Hazaran Council` when the installed `r -> *ran` rule is present.

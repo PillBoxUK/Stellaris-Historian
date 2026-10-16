@@ -17,6 +17,7 @@ const constructModal = document.getElementById("construct-modal");
 const constructCancel = document.getElementById("construct-cancel");
 const constructConfirm = document.getElementById("construct-confirm");
 const viewJournalButton = document.getElementById("view-journal");
+const viewWarJournalButton = document.getElementById("view-war-journal");
 const openCampaignFolderButton = document.getElementById("open-campaign-folder");
 const openDiagnosticsFolderButton = document.getElementById("open-diagnostics-folder");
 const closeButton = document.getElementById("close-app");
@@ -52,6 +53,17 @@ function applyActionAvailability(data = latestCampaignState){
 
   constructButton.disabled =
     actionInProgress || liveBlocking || archived === 0;
+
+  viewWarJournalButton.disabled =
+    actionInProgress || liveBusy || archived === 0 || unprocessed > 0;
+
+  viewWarJournalButton.title = liveBusy
+    ? "Wait for the current Live History update to finish before opening the War Journal."
+    : (unprocessed > 0
+      ? "Run Update History first so the War Journal uses fully processed evidence."
+      : (archived > 0
+        ? "Open the evidence-led War Journal for this campaign."
+        : "No archived saves are available for the War Journal."));
 
   updateButton.title = liveBlocking
     ? "Live History is ON or finishing an automatic history update."
@@ -100,6 +112,7 @@ async function loadActive(){
     );
 
     const data = await response.json();
+    window.HistorianFavicon?.fromData(data);
 
     if(appVersion && data.version){
       appVersion.textContent = data.version;
@@ -137,6 +150,7 @@ async function loadActive(){
         `).join("")
       : "Waiting for the first stable save to be archived.";
   }catch(error){
+    window.HistorianFavicon?.offline();
     status.textContent =
       `Could not refresh campaign status: ${error}`;
   }
@@ -360,6 +374,14 @@ constructConfirm.addEventListener("click", async () => {
     constructButton.textContent = "Construct Campaign";
     applyActionAvailability();
   }
+});
+
+viewWarJournalButton.addEventListener("click", () => {
+  window.open(
+    "/war-journal",
+    "_blank",
+    "noopener"
+  );
 });
 
 viewJournalButton.addEventListener("click", () => {

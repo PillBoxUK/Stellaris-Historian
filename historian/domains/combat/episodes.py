@@ -119,15 +119,11 @@ def _engagement_starbase_names(row: CorrelatedEngagement) -> tuple[str, ...]:
 
 
 def _formal_outcome(engagements: list[CorrelatedEngagement]) -> str | None:
-    outcomes: set[bool] = set()
-    for engagement in engagements:
-        for battle in engagement.formal_battles:
-            if battle.player_victory is not None:
-                outcomes.add(bool(battle.player_victory))
-    if outcomes == {True}:
-        return "victory"
-    if outcomes == {False}:
-        return "defeat"
+    """Withhold tactical outcome until attacker_victory semantics are validated.
+
+    Retain raw formal battles on each engagement for audit and future reprocessing.
+    This deliberately does not reverse or discard the source records.
+    """
     return None
 
 

@@ -20,10 +20,16 @@ from historian import __version__
 from historian.config import load_config
 from historian.console import activity, error, format_duration, info, warning
 from historian.db import Database
-from historian.history_processor import construct_campaign, process_unprocessed, review_campaign
+from historian.history_processor import (
+    construct_campaign,
+    process_unprocessed,
+    refresh_processed_combat_diagnostics,
+    review_campaign,
+)
 from historian.journal import journal_path, render_journal
 from historian.scribes import render_scribes_journal, render_scribes_pdf
 from historian.timeline import render_timeline
+from historian.war_journal import render_war_journal
 from historian.localisation import write_origin_localisation_debug
 from historian.save_reader import read_campaign_summary, read_empire_profile, valid_stellaris_save
 from historian.watcher import CampaignWatcher
@@ -126,20 +132,9 @@ def _live_history_loop() -> None:
             LIVE_HISTORY_STATUS = f"ON - processing {waiting} archived save(s)"
             activity(f"LIVE HISTORY - {waiting} archived save(s) waiting")
             try:
+                batch_started = time.perf_counter()
                 result = process_unprocessed(DB, campaign_id)
-
-                if result["processed"]:
-                    _refresh_first_contact_history_for_journal(
-                        campaign_id,
-                        "LIVE HISTORY",
-                    )
-                    activity("LIVE HISTORY - refreshing Historical_Journal.html...")
-                    journal_started = time.perf_counter()
-                    render_journal(DB, campaign_id)
-                    activity(
-                        "LIVE HISTORY - Historical_Journal.html refresh complete - "
-                        f"{format_duration(time.perf_counter() - journal_started)}"
-                    )
+                history_elapsed = time.perf_counter() - batch_started
 
                 if result["errors"]:
                     LIVE_HISTORY_ENABLED = False
@@ -147,12 +142,71 @@ def _live_history_loop() -> None:
                         "OFF - processing error: " + result["errors"][0]
                     )
                     error("LIVE HISTORY STOPPED - " + result["errors"][0])
-                else:
+                    continue
+
+                remaining = int(result.get("remaining", 0) or 0)
+                if remaining > 0:
                     LIVE_HISTORY_STATUS = (
-                        "ON - waiting for the next archived save"
-                        if LIVE_HISTORY_ENABLED
-                        else "OFF"
+                        f"ON - catching up: {remaining} archived save(s) still waiting"
                     )
+                    activity(
+                        "LIVE HISTORY - history queue still has "
+                        f"{remaining} save(s); expensive First Contact / journal "
+                        "refresh deferred until the queue is caught up."
+                    )
+                    continue
+
+                # A save can arrive after process_unprocessed() counted zero.
+                # Give archive/history priority and never begin the expensive
+                # presentation refresh while new history work is already waiting.
+                if DB.unprocessed_count(campaign_id) > 0:
+                    LIVE_HISTORY_STATUS = "ON - new save arrived; continuing history catch-up"
+                    activity(
+                        "LIVE HISTORY - a new archived save arrived before presentation "
+                        "refresh; continuing history catch-up first."
+                    )
+                    continue
+
+                if result["processed"]:
+                    combat_started = time.perf_counter()
+                    combat_sync = refresh_processed_combat_diagnostics(
+                        DB,
+                        campaign_id,
+                    )
+                    combat_elapsed = time.perf_counter() - combat_started
+                    if not combat_sync.get("refreshed", False):
+                        warning(
+                            "LIVE HISTORY - combat diagnostics could not be synchronized "
+                            "from cache; existing diagnostic files were left unchanged."
+                        )
+
+                    contact_started = time.perf_counter()
+                    _refresh_first_contact_history_for_journal(
+                        campaign_id,
+                        "LIVE HISTORY",
+                    )
+                    contact_elapsed = time.perf_counter() - contact_started
+                    activity("LIVE HISTORY - refreshing Historical_Journal.html...")
+                    journal_started = time.perf_counter()
+                    render_journal(DB, campaign_id)
+                    activity(
+                        "LIVE HISTORY - Historical_Journal.html refresh complete - "
+                        f"{format_duration(time.perf_counter() - journal_started)}"
+                    )
+                    activity(
+                        "PERF LIVE BATCH - "
+                        f"History {format_duration(history_elapsed)} | "
+                        f"Combat sync {format_duration(combat_elapsed)} | "
+                        f"First Contact {format_duration(contact_elapsed)} | "
+                        f"Journal {format_duration(time.perf_counter() - journal_started)} | "
+                        f"Total {format_duration(time.perf_counter() - batch_started)}"
+                    )
+
+                LIVE_HISTORY_STATUS = (
+                    "ON - waiting for the next archived save"
+                    if LIVE_HISTORY_ENABLED
+                    else "OFF"
+                )
             finally:
                 LIVE_HISTORY_BUSY = False
 
@@ -288,7 +342,7 @@ def _first_contact_history_refresh(
                 f"scanning {done}/{total} - {snapshot.get('game_date', 'unknown date')}"
             )
 
-    return write_first_contact_history(DB, campaign_id, progress=progress)
+    return write_first_contact_history(DB, campaign_id, progress=progress, force=True)
 
 
 def _refresh_first_contact_history_for_journal(campaign_id: int, label: str) -> None:
@@ -296,7 +350,7 @@ def _refresh_first_contact_history_for_journal(campaign_id: int, label: str) -> 
         started = time.perf_counter()
         write_first_contact_history(DB, campaign_id)
         activity(
-            f"{label} - structured First Contact history refreshed - "
+            f"{label} - structured First Contact history checked - "
             f"{format_duration(time.perf_counter() - started)}"
         )
     except Exception as exc:
@@ -618,15 +672,31 @@ def api_update_history():
             "No campaign is active.",
         )
 
+    operation_started = time.perf_counter()
     result = process_unprocessed(
         DB,
         ACTIVE_CAMPAIGN_ID,
     )
+    history_elapsed = time.perf_counter() - operation_started
 
+    combat_sync = None
+    if result["processed"] and int(result.get("remaining", 0) or 0) == 0:
+        combat_sync = refresh_processed_combat_diagnostics(
+            DB,
+            ACTIVE_CAMPAIGN_ID,
+        )
+        if not combat_sync.get("refreshed", False):
+            warning(
+                "UPDATE HISTORY - combat diagnostics could not be synchronized "
+                "from cache; existing diagnostic files were left unchanged."
+            )
+
+    contact_started = time.perf_counter()
     _refresh_first_contact_history_for_journal(
         ACTIVE_CAMPAIGN_ID,
         "UPDATE HISTORY",
     )
+    contact_elapsed = time.perf_counter() - contact_started
 
     activity(
         "Rendering Historical_Journal.html..."
@@ -637,6 +707,15 @@ def api_update_history():
     journal = render_journal(
         DB,
         ACTIVE_CAMPAIGN_ID,
+    )
+
+    activity(
+        "PERF UPDATE HISTORY - "
+        f"History {format_duration(history_elapsed)} | "
+        f"Combat sync {format_duration(float((combat_sync or {}).get('duration_seconds', 0)))} | "
+        f"First Contact {format_duration(contact_elapsed)} | "
+        f"Journal {format_duration(time.perf_counter() - journal_started)} | "
+        f"Total {format_duration(time.perf_counter() - operation_started)}"
     )
 
     activity(
@@ -660,6 +739,11 @@ def api_update_history():
             f"Historical_Journal.html updated successfully. "
             f"{result['remaining']} save(s) remain unprocessed."
         )
+        if combat_sync and combat_sync.get("refreshed", False):
+            message += (
+                f" Combat diagnostics synchronized through "
+                f"{combat_sync.get('latest_game_date', 'the latest processed snapshot')}."
+            )
         if politics_warnings:
             message += (
                 f" Politics/Diplomacy produced {len(politics_warnings)} warning(s); "
@@ -675,6 +759,7 @@ def api_update_history():
         "recovered": recovered,
         "journal_path": str(journal),
         "journal_url": "/journal",
+        "combat_diagnostics": combat_sync,
         "message": message,
     }
 
@@ -1054,6 +1139,154 @@ def open_journal():
             404,
             "Historical journal has not been created yet.",
         )
+
+    return FileResponse(
+        path,
+        media_type="text/html",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+
+@app.get("/api/war-aftermath")
+def war_aftermath_api(war_id: int = Query(..., ge=0)):
+    """On-demand, read-only examination of the archived war-ending interval."""
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, "No campaign is active.")
+    from historian.presentation_history import build_presentation_history
+    from historian.war_journal import _aggregate_formal_wars
+    from historian.war_aftermath import analyze_war_aftermath
+    try:
+        history = build_presentation_history(DB, ACTIVE_CAMPAIGN_ID)
+        record = next((w for w in _aggregate_formal_wars(history) if w.war_id == war_id), None)
+        if record is None or not record.first_absent_after_last:
+            raise HTTPException(404, "No closed-war archive interval is available for this ID.")
+        last = next((s for s in reversed(history.combat_snapshots)
+                     if s.game_date == record.last_observed), None)
+        if last is None:
+            raise HTTPException(422, "Player country could not be established.")
+        players = int(last.player_country_id)
+        parties = tuple(set(record.attacker_country_ids + record.defender_country_ids))
+        report = analyze_war_aftermath(
+            DB, ACTIVE_CAMPAIGN_ID, war_id, record.last_observed,
+            record.first_absent_after_last, parties, players,
+        )
+        return JSONResponse(report, headers={"Cache-Control": "no-store"})
+    except HTTPException:
+        raise
+    except Exception as exc:
+        error(f"WAR AFTERMATH - {exc}")
+        raise HTTPException(500, f"Territorial evidence could not be read: {exc}") from exc
+
+
+# Military investigation jobs live only in this server process. Read-only;
+# save/SQLite records are not modified. A running job cannot be duplicated.
+_MILITARY_TASK_LOCK = threading.Lock()
+_MILITARY_TASKS: dict[tuple[int, int], dict] = {}
+
+
+def _run_military_job(campaign_id: int, war_id: int, task: dict):
+    try:
+        from historian.presentation_history import build_presentation_history
+        from historian.war_journal import _aggregate_formal_wars
+        from historian.war_intelligence import investigate_war
+        history = build_presentation_history(DB, campaign_id)
+        war = next((w for w in _aggregate_formal_wars(history) if w.war_id == war_id), None)
+        if war is None:
+            raise ValueError("War not found in processed history")
+        last = next((s for s in reversed(history.combat_snapshots) if s.game_date == war.last_observed), None)
+        if last is None:
+            raise ValueError("Player country not established")
+        def report_progress(done, total, date, stats):
+            with _MILITARY_TASK_LOCK:
+                task.update(processed=done, total=total, current_date=date, **stats)
+        result = investigate_war(DB, campaign_id, war_id, int(last.player_country_id),
+            tuple(set(war.attacker_country_ids + war.defender_country_ids)),
+            war.start_date or war.first_observed, war.first_absent_after_last or war.last_observed,
+            progress=report_progress)
+        with _MILITARY_TASK_LOCK:
+            task.update(status="done", result=result)
+    except Exception as exc:
+        error(f"WAR INTELLIGENCE BACKGROUND - {exc}")
+        with _MILITARY_TASK_LOCK:
+            task.update(status="failed", error=str(exc))
+
+
+@app.get("/api/war-intelligence/start")
+def start_war_intelligence(war_id: int = Query(..., ge=0)):
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, "No campaign is active.")
+    campaign_id = ACTIVE_CAMPAIGN_ID
+    key = (campaign_id, war_id)
+    # Reuse completed work only while the processed archive stays unchanged.
+    # A later save may contain new battles or occupations.
+    rows = DB.processed_snapshots(campaign_id)
+    archive_marker = (int(rows[-1]["id"]), str(rows[-1]["sha256"])) if rows else None
+    with _MILITARY_TASK_LOCK:
+        old = _MILITARY_TASKS.get(key)
+        if old and (old.get("status") == "running" or
+                    (old.get("status") == "done" and old.get("archive_marker") == archive_marker)):
+            return {"status": old["status"], "war_id": war_id, "reused": True}
+        task = {"status": "running", "processed": 0, "total": 0, "current_date": "Preparing",
+                "cache_hits": 0, "raw_reads": 0, "legacy_reused": 0,
+                "archive_marker": archive_marker}
+        _MILITARY_TASKS[key] = task
+    threading.Thread(target=_run_military_job, args=(campaign_id, war_id, task),
+                     name=f"HistorianMilitary-{war_id}", daemon=True).start()
+    return {"status": "running", "war_id": war_id, "reused": False}
+
+
+@app.get("/api/war-intelligence/status")
+def status_war_intelligence(war_id: int = Query(..., ge=0)):
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, "No campaign is active.")
+    with _MILITARY_TASK_LOCK:
+        task = _MILITARY_TASKS.get((ACTIVE_CAMPAIGN_ID, war_id))
+        if task is None:
+            raise HTTPException(404, "No investigation has been started for this war")
+        return dict(task)
+
+
+@app.get("/api/war-intelligence")
+def war_intelligence_api(war_id: int = Query(..., ge=0)):
+    """On-demand, evidence-only army, planetary and enemy-starbase investigation."""
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, "No campaign is active.")
+    from historian.presentation_history import build_presentation_history
+    from historian.war_journal import _aggregate_formal_wars
+    from historian.war_intelligence import investigate_war
+    try:
+        history = build_presentation_history(DB, ACTIVE_CAMPAIGN_ID)
+        record = next((w for w in _aggregate_formal_wars(history) if w.war_id == war_id), None)
+        if record is None:
+            raise HTTPException(404, "War not found in processed history")
+        last = next((s for s in reversed(history.combat_snapshots)
+                     if s.game_date == record.last_observed), None)
+        if last is None:
+            raise HTTPException(422, "Player country not established")
+        report = investigate_war(
+            DB, ACTIVE_CAMPAIGN_ID, war_id, int(last.player_country_id),
+            tuple(set(record.attacker_country_ids + record.defender_country_ids)),
+            record.start_date or record.first_observed,
+            record.first_absent_after_last or record.last_observed,
+        )
+        return JSONResponse(report, headers={"Cache-Control": "no-store"})
+    except HTTPException:
+        raise
+    except Exception as exc:
+        error(f"WAR INTELLIGENCE - {exc}")
+        raise HTTPException(500, f"Military evidence could not be read: {exc}") from exc
+
+
+@app.get("/war-journal")
+def open_war_journal():
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, "No campaign is active.")
+
+    try:
+        path = render_war_journal(DB, ACTIVE_CAMPAIGN_ID)
+    except Exception as exc:
+        error(f"WAR JOURNAL - {exc}")
+        raise HTTPException(500, f"War Journal could not be rendered: {exc}") from exc
 
     return FileResponse(
         path,

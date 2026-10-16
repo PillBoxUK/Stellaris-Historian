@@ -2,153 +2,187 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+from contextlib import contextmanager
+from contextvars import ContextVar
+
+# A per-save lifetime is essential: retaining large Stellaris text across
+# quarterly saves would increase memory use without bound.
+_PARSE_INDEX: ContextVar[dict | None] = ContextVar("historian_scan_index", default=None)
+_INDEX_MIN_CHARS = 100_000
+
+
+@contextmanager
+def indexed_scan_scope():
+    token = _PARSE_INDEX.set({"blocks": {}, "numbers": {}, "indented": {}})
+    try:
+        yield
+    finally:
+        _PARSE_INDEX.reset(token)
+
 
 from ..localisation import resolve_localisation_key
 
 
-def _extract_braced_after(text: str, token_start: int) -> str | None:
-    brace = text.find("{", token_start)
+# A native Stellaris gamestate can exceed 50 MB. Scanning every character in
+# Python for every block extraction made Ships, People and Science progressively
+# more expensive as the galaxy grew. Find structural tokens in C instead, and
+# inspect Python state only for braces / quotes. Semantics remain identical.
+_STRUCTURAL_TOKENS = re.compile(r'[{}"]')
 
+
+def _braced_content_and_end(text: str, token_start: int) -> tuple[str | None, int | None]:
+    brace = text.find("{", token_start)
     if brace < 0:
-        return None
+        return None, None
 
     depth = 0
-    in_quote = False
-    escaped = False
-
-    for index in range(brace, len(text)):
-        char = text[index]
-
-        if in_quote:
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == '"':
-                in_quote = False
-            continue
-
+    quoted = False
+    for match in _STRUCTURAL_TOKENS.finditer(text, brace):
+        index = match.start()
+        char = match.group()
         if char == '"':
-            in_quote = True
-        elif char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
+            # Quoted escaped quotes are not delimiters. A run of backslashes
+            # only escapes a quote when its length is odd (\\" vs \").
+            backslashes = 0
+            before = index - 1
+            while before >= brace and text[before] == "\\":
+                backslashes += 1
+                before -= 1
+            if backslashes % 2 == 0:
+                quoted = not quoted
+        elif not quoted:
+            if char == "{":
+                depth += 1
+            else:
+                depth -= 1
+                if depth == 0:
+                    return text[brace + 1:index], index + 1
+    return None, None
 
-            if depth == 0:
-                return text[brace + 1:index]
 
-    return None
+def _extract_braced_after(text: str, token_start: int) -> str | None:
+    content, _end = _braced_content_and_end(text, token_start)
+    return content
 
 
 def _find_named_block(text: str, key: str) -> str | None:
-    match = re.search(
-        rf'(?m)^{re.escape(key)}\s*=\s*\{{',
-        text,
-    )
+    context = _PARSE_INDEX.get()
+    use_cache = context is not None and len(text) >= _INDEX_MIN_CHARS
+    cache_key = (id(text), key)
+    if use_cache:
+        saved = context["blocks"].get(cache_key)
+        if saved is not None:
+            return saved[1]
 
+    match = re.search(rf'(?m)^{re.escape(key)}\s*=\s*\{{', text)
     if not match:
-        match = re.search(
-            rf'(?m)^\s*{re.escape(key)}\s*=\s*\{{',
-            text,
-        )
-
-    if not match:
-        return None
-
-    return _extract_braced_after(
-        text,
-        match.start(),
-    )
+        match = re.search(rf'(?m)^\s*{re.escape(key)}\s*=\s*\{{', text)
+    result = _extract_braced_after(text, match.start()) if match else None
+    if use_cache:
+        # Hold text while cached: re-used Python object IDs can otherwise
+        # silently associate a different subsection with the old result.
+        context["blocks"][cache_key] = (text, result)
+    return result
 
 
 def _top_numeric_records(block: str | None):
     if not block:
         return
 
-    pattern = re.compile(
-        r'(?m)^\s*(\d+)\s*=\s*\{'
-    )
-
+    pattern = re.compile(r'(?m)^\s*(\d+)\s*=\s*\{')
     position = 0
-
-    while True:
-        match = pattern.search(
-            block,
-            position,
-        )
-
-        if not match:
+    while (match := pattern.search(block, position)) is not None:
+        # Extract the content and the record endpoint in ONE balanced scan.
+        # The previous implementation rescanned every record a second time.
+        record, end = _braced_content_and_end(block, match.start())
+        if record is None or end is None:
             break
-
-        record = _extract_braced_after(
-            block,
-            match.start(),
-        )
-
-        if record is None:
-            break
-
-        brace = block.find(
-            "{",
-            match.start(),
-        )
-
-        depth = 0
-        in_quote = False
-        escaped = False
-        end = None
-
-        for index in range(brace, len(block)):
-            char = block[index]
-
-            if in_quote:
-                if escaped:
-                    escaped = False
-                elif char == "\\":
-                    escaped = True
-                elif char == '"':
-                    in_quote = False
-                continue
-
-            if char == '"':
-                in_quote = True
-            elif char == "{":
-                depth += 1
-            elif char == "}":
-                depth -= 1
-
-                if depth == 0:
-                    end = index + 1
-                    break
-
         yield int(match.group(1)), record
-
-        if end is None:
-            break
-
         position = end
 
 
-def _numeric_record(
-    block: str | None,
-    numeric_id: int,
-) -> str | None:
+def _numeric_record(block: str | None, numeric_id: int) -> str | None:
     if not block:
         return None
+    context = _PARSE_INDEX.get()
+    if context is not None and len(block) >= _INDEX_MIN_CHARS:
+        key = id(block)
+        entry = context["numbers"].get(key)
+        if entry is None:
+            entry = {"text": block, "lookups": 0, "individual": {}, "offsets": None}
+            context["numbers"][key] = entry
+        if entry["offsets"] is not None:
+            span = entry["offsets"].get(numeric_id)
+            return block[span[0]:span[1]] if span is not None else None
+        if numeric_id in entry["individual"]:
+            return entry["individual"][numeric_id]
+        entry["lookups"] += 1
+        if entry["lookups"] >= 3:
+            # The indexed traversal skips nested numeric IDs and is shared
+            # among all Ships, People and Science lookups for this save.
+            offsets = {}
+            position = 0
+            pattern = re.compile(r'(?m)^\s*(\d+)\s*=\s*\{')
+            while (match := pattern.search(block, position)) is not None:
+                opening = block.find("{", match.start())
+                _content, end = _braced_content_and_end(block, match.start())
+                if end is None:
+                    break
+                offsets[int(match.group(1))] = (opening + 1, end - 1)
+                position = end
+            entry["offsets"] = offsets
+            entry["individual"].clear()
+            span = offsets.get(numeric_id)
+            return block[span[0]:span[1]] if span is not None else None
+    else:
+        entry = None
 
-    match = re.search(
-        rf'(?m)^\s*{numeric_id}\s*=\s*\{{',
-        block,
-    )
+    match = re.search(rf'(?m)^\s*{numeric_id}\s*=\s*\{{', block)
+    result = _extract_braced_after(block, match.start()) if match else None
+    if entry is not None:
+        entry["individual"][numeric_id] = result
+    return result
 
-    if not match:
+
+def _indented_numeric_record(block: str | None, numeric_id: int) -> str | None:
+    """Resolve only direct numeric children at the first record's indent."""
+    if not block:
         return None
-
-    return _extract_braced_after(
-        block,
-        match.start(),
-    )
+    context = _PARSE_INDEX.get()
+    use_cache = context is not None and len(block) >= _INDEX_MIN_CHARS
+    key = id(block)
+    entry = context["indented"].get(key) if use_cache else None
+    if entry is None:
+        first = re.search(r'(?m)^([ \t]*)\d+\s*=\s*\{', block)
+        if not first:
+            return None
+        entry = {"text": block, "indent": first.group(1), "count": 0,
+                 "individual": {}, "offsets": None}
+        if use_cache:
+            context["indented"][key] = entry
+    if entry["offsets"] is not None:
+        span = entry["offsets"].get(numeric_id)
+        return block[span[0]:span[1]] if span else None
+    if numeric_id in entry["individual"]:
+        return entry["individual"][numeric_id]
+    entry["count"] += 1
+    if use_cache and entry["count"] >= 3:
+        pattern = re.compile(rf'(?m)^{re.escape(entry["indent"])}(\d+)\s*=\s*\{{')
+        offsets = {}
+        for match in pattern.finditer(block):
+            opening = block.find("{", match.start())
+            _content, end = _braced_content_and_end(block, match.start())
+            if end is not None:
+                offsets[int(match.group(1))] = (opening + 1, end - 1)
+        entry["offsets"] = offsets
+        entry["individual"].clear()
+        span = offsets.get(numeric_id)
+        return block[span[0]:span[1]] if span else None
+    match = re.search(rf'(?m)^{re.escape(entry["indent"])}{numeric_id}\s*=\s*\{{', block)
+    result = _extract_braced_after(block, match.start()) if match else None
+    if use_cache:
+        entry["individual"][numeric_id] = result
+    return result
 
 
 def _scalar(

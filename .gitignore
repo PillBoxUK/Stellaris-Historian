@@ -12,3 +12,28 @@ data/
 Stellaris Backup.zip
 Updates and source/
 config.json
+
+# Stellaris Historian - Private Data
+autobackups/
+folder_reports/
+archived_installers/
+archived_utilities/
+payload/
+
+# Databases and temporary database files
+*.db
+*.db-wal
+*.db-shm
+*.jsonl
+
+# Credentials and local settings
+.env
+.env.*
+*.pem
+*.key
+client_secret*.json
+credentials*.json
+
+# Local utility archives
+Historian_Safe_Cleanup_Utility/
+Historian_Safe_Cleanup_Utility.zip

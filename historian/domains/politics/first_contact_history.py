@@ -5,6 +5,8 @@ import json
 import os
 import re
 import tempfile
+import zlib
+import time
 from typing import Callable
 
 from ...core.stellaris_text import (
@@ -1338,19 +1340,244 @@ def load_first_contact_history(db: Database, campaign_id: int) -> dict:
     return data if isinstance(data, dict) else {"cases": [], "events": []}
 
 
+# v0.0.65 performance cache.  This is NOT a lossy historical filter: the
+# original .sav remains unchanged, and we retain the complete native country
+# and first_contacts trees needed by the existing First Contact decoder. Other
+# game-state domains (including AI wars) are still fully parsed and cached.
+_CONTACT_CACHE_VERSION = 1
+_CONTACT_DECODER_REVISION = "0.0.65-fc-1"
+_CONTACT_CACHE_MAGIC = b"HFCINDEX1\n"
+
+
+def _contact_projection(gamestate: str) -> str | None:
+    """Create a lossless projection for all First Contact raw lookups.
+
+    All gamestate access in this decoder goes through _country_record() and
+    _contact_record(). Both read the complete named native blocks below.
+    If a required block cannot be located, never substitute partial evidence.
+    """
+    country = _find_named_block(gamestate, "country")
+    first_contacts = _find_named_block(gamestate, "first_contacts")
+    if country is None or first_contacts is None:
+        return None
+    return "country={\n" + country + "\n}\nfirst_contacts={\n" + first_contacts + "\n}\n"
+
+
+def _read_contact_index(row: dict, cache_dir: Path) -> tuple[str, str]:
+    """Load a validated per-save contact projection or create it once.
+
+    The cache includes the saved SHA filename and an archive stat fingerprint;
+    decompression/corruption failures fall back to the original archive.
+    Atomic writes make it safe to interrupt Historian during an update.
+    """
+    archive = Path(row["archive_path"])
+    sha = str(row["sha256"])
+    stat = archive.stat()
+    fingerprint = f"{stat.st_size}:{stat.st_mtime_ns}\n".encode("ascii")
+    folder = Path(cache_dir) / "first_contact_raw"
+    cache_path = folder / f"{sha}.v{_CONTACT_CACHE_VERSION}.zlib"
+    try:
+        if cache_path.is_file():
+            content = cache_path.read_bytes()
+            header = _CONTACT_CACHE_MAGIC + fingerprint
+            if content.startswith(header):
+                projection = zlib.decompress(content[len(header):]).decode("utf-8")
+                if "country={" in projection and "first_contacts={" in projection:
+                    return projection, "hit"
+    except (OSError, zlib.error, UnicodeError, ValueError):
+        pass  # Corrupt/mismatched derived cache: use the authoritative .sav.
+
+    _meta, gamestate = read_save_texts(archive)
+    projection = _contact_projection(gamestate)
+    if projection is None:
+        return gamestate, "raw-no-index"
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        payload = _CONTACT_CACHE_MAGIC + fingerprint + zlib.compress(projection.encode("utf-8"), level=1)
+        temporary = cache_path.with_suffix(".tmp")
+        temporary.write_bytes(payload)
+        os.replace(temporary, cache_path)
+    except OSError:
+        # A readonly cache folder should never stop history publication.
+        pass
+    return projection, "built"
+
+
+def _is_current_contact_report(path: Path, debug_path: Path, rows: list[dict]) -> bool:
+    """Skip an unchanged, complete report; check decoder revision as well."""
+    if not path.is_file() or not debug_path.is_file():
+        return False
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            previous = json.load(handle)
+        last = rows[-1] if rows else None
+        return (
+            isinstance(previous, dict)
+            and previous.get("decoder_revision") == _CONTACT_DECODER_REVISION
+            and previous.get("processed_snapshots_considered") == len(rows)
+            and previous.get("last_processed_snapshot_id") == (int(last["id"]) if last else None)
+            and previous.get("last_processed_sha256") == (str(last["sha256"]) if last else None)
+        )
+    except (OSError, ValueError, TypeError, KeyError):
+        return False
+
+
+
+
+def _reuse_completed_first_contact_history(
+    *,
+    json_path: Path,
+    debug_path: Path,
+    rows: list[dict],
+    source_save: Path,
+    cache_dir: Path,
+    archived_snapshot_count: int,
+) -> bool:
+    """Extend an unchanged First Contact report without replaying old history.
+
+    Safe only when all previously observed assignments ended and every
+    counterpart/owner identity was resolved. Thus later raw checkpoints and
+    relation names cannot change any previously published case. Look at
+    every newly processed snapshot's leader state (cache-only) and fall back
+    to the authoritative full decoder if any new First Contact assignment,
+    missing cache, changed boundary, or unresolved evidence is detected.
+
+    Original saves, event content, case content, and forensic caches are
+    untouched. `force=True` always bypasses this shortcut.
+    """
+    if not json_path.is_file() or not debug_path.is_file() or not rows:
+        return False
+    try:
+        old = json.loads(json_path.read_text(encoding="utf-8"))
+        old_count = int(old.get("processed_snapshots_considered", 0))
+        if (
+            old.get("decoder_revision") != _CONTACT_DECODER_REVISION
+            or not 0 < old_count < len(rows)
+            or old.get("last_processed_snapshot_id") != int(rows[old_count-1]["id"])
+            or old.get("last_processed_sha256") != str(rows[old_count-1]["sha256"])
+            or old.get("raw_read_failures")
+            or not isinstance(old.get("cases"), list)
+            or not isinstance(old.get("events"), list)
+        ):
+            return False
+        for case in old["cases"]:
+            if (
+                not isinstance(case, dict)
+                or not isinstance(case.get("assignment_end_interval"), dict)
+                or not case.get("counterpart_resolved_name")
+                or not case.get("owner_country_name")
+                or case.get("record_found") is False
+            ):
+                return False
+
+        # Existing cases are closed. A new assignment, even one begun in the
+        # latest snapshot, must trigger a complete reevaluation. Never parse
+        # from raw here: a missing/invalid component cache is a cache miss.
+        for row in rows[old_count:]:
+            (
+                _profile, _ships, leaders, _worlds, _science, _combat,
+                _technology, _politics, cache_status,
+            ) = load_or_parse_snapshot(
+                archive_path=Path(row["archive_path"]),
+                source_save=source_save,
+                source_sha256=row["sha256"],
+                snapshot_id=int(row["id"]),
+                cache_dir=cache_dir,
+                cache_only=True,
+            )
+            if cache_status != "hit":
+                return False
+            if any(
+                leader.location_type == "first_contact_system"
+                for leader in leaders.leaders.values()
+            ):
+                return False
+
+        old["last_processed_snapshot_id"] = int(rows[-1]["id"])
+        old["last_processed_sha256"] = str(rows[-1]["sha256"])
+        old["processed_snapshots_considered"] = len(rows)
+        old["archived_snapshots"] = archived_snapshot_count
+        old["unprocessed_snapshots_ignored"] = max(0, archived_snapshot_count - len(rows))
+        old["incremental_reuse"] = {
+            "mode": "closed-and-resolved-assignments",
+            "new_snapshots_checked": len(rows) - old_count,
+            "newest_game_date": str(rows[-1]["game_date"]),
+            "historical_cases_unchanged": True,
+            "note": "Cache/raw scan counts describe the last full investigation."
+        }
+        # Keep the complete prior forensic case report, updating only the
+        # archive header. All historical statements remain byte-for-byte the
+        # same, including their evidence windows and confidence.
+        original_lines = debug_path.read_text(encoding="utf-8").splitlines()
+        counts = {
+            "Archived snapshots:": str(archived_snapshot_count),
+            "Processed snapshots considered:": str(len(rows)),
+            "Unprocessed snapshots ignored:": str(max(0, archived_snapshot_count - len(rows))),
+        }
+        amended = []
+        for line in original_lines:
+            replacement = next((f"{prefix} {value}" for prefix, value in counts.items() if line.startswith(prefix)), None)
+            if line.startswith("Incremental evidence reuse:"):
+                continue
+            amended.append(replacement if replacement is not None else line)
+        label = f"Incremental evidence reuse: verified through {rows[-1]['game_date']}; no new First Contact assignments; {len(old['cases'])} closed cases retained (raw/cache counts reflect last full scan)."
+        # Insert in header without duplicating lines on subsequent updates.
+        insert_at = next((i for i, line in enumerate(amended) if line == "CASES"), len(amended))
+        amended.insert(insert_at, label)
+        new_debug = "\n".join(amended) + "\n"
+        # Publish diagnostic first, then JSON watermark. If interrupted between
+        # the writes, the next run retries safely and the old JSON still
+        # governs whether the report can be reused.
+        _atomic_text(debug_path, new_debug)
+        _atomic_text(json_path, json.dumps(old, ensure_ascii=False, indent=2) + "\n")
+        return True
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, RuntimeError):
+        return False
+
+
+def _atomic_text(path: Path, value: str) -> None:
+    fd, name = tempfile.mkstemp(prefix="historian_reuse_", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(value)
+        os.replace(name, path)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
 def write_first_contact_history(
     db: Database,
     campaign_id: int,
     *,
     progress: ProgressCallback | None = None,
+    force: bool = False,
 ) -> Path:
     campaign = db.campaign(campaign_id)
     if campaign is None:
         raise ValueError("Campaign does not exist.")
 
-    rows = [dict(row) for row in db.all_snapshots(campaign_id)]
+    archived_snapshot_count = len(db.all_snapshots(campaign_id))
+    rows = [dict(row) for row in db.processed_snapshots(campaign_id)]
+    ignored_unprocessed = max(0, archived_snapshot_count - len(rows))
     source_save = Path(campaign["source_save"])
     cache_dir = campaign_cache_dir(Path(campaign["archive_dir"]))
+    diagnostics = Path(campaign["archive_dir"]) / "diagnostics"
+    json_path = diagnostics / _HISTORY_JSON
+    debug_path = diagnostics / _HISTORY_DEBUG
+    if not force:
+        if _is_current_contact_report(json_path, debug_path, rows):
+            return debug_path
+        if _reuse_completed_first_contact_history(
+            json_path=json_path,
+            debug_path=debug_path,
+            rows=rows,
+            source_save=source_save,
+            cache_dir=cache_dir,
+            archived_snapshot_count=archived_snapshot_count,
+        ):
+            return debug_path
+    cache_start = time.perf_counter()
 
     profiles = []
     leader_snapshots = []
@@ -1384,13 +1611,15 @@ def write_first_contact_history(
 
     raw: dict[int, str] = {}
     failures: list[str] = []
+    projection_cache = {"hit": 0, "built": 0, "raw-no-index": 0}
     for position, index in enumerate(selected, start=1):
         row = rows[index]
         if progress is not None:
             progress(position, len(selected), row)
         try:
-            _meta, gamestate = read_save_texts(Path(row["archive_path"]))
+            gamestate, raw_cache_status = _read_contact_index(row, cache_dir)
             raw[index] = gamestate
+            projection_cache[raw_cache_status] += 1
         except Exception as exc:
             failures.append(f"{row['game_date']} | {row['archive_filename']} | {exc}")
 
@@ -1414,15 +1643,19 @@ def write_first_contact_history(
     ]
     events = _events(cases)
 
-    diagnostics = Path(campaign["archive_dir"]) / "diagnostics"
     diagnostics.mkdir(parents=True, exist_ok=True)
-    json_path = diagnostics / _HISTORY_JSON
-    debug_path = diagnostics / _HISTORY_DEBUG
 
     payload = {
         "version": "0.0.50.4",
+        "decoder_revision": _CONTACT_DECODER_REVISION,
+        "last_processed_snapshot_id": int(rows[-1]["id"]) if rows else None,
+        "last_processed_sha256": str(rows[-1]["sha256"]) if rows else None,
+        "raw_projection_cache": projection_cache,
+        "refresh_duration_seconds": round(time.perf_counter() - cache_start, 3),
         "campaign": str(campaign["empire_name"]),
-        "archived_snapshots": len(rows),
+        "archived_snapshots": archived_snapshot_count,
+        "processed_snapshots_considered": len(rows),
+        "unprocessed_snapshots_ignored": ignored_unprocessed,
         "player_country_id": player_country_id,
         "assignment_windows": len(windows),
         "raw_snapshots_read": len(raw),
@@ -1455,11 +1688,14 @@ def write_first_contact_history(
         "Counterpart identity now also applies installed Stellaris adj_NN* adjective suffix grammar inside nested %ADJ% / %ADJECTIVE% names, rejects technical relation/localisation labels before publication, and retains rejected candidates diagnostically; two-sided completion checks remain unchanged.",
         "",
         f"Campaign: {campaign['empire_name']}",
-        f"Archived snapshots: {len(rows)}",
+        f"Archived snapshots: {archived_snapshot_count}",
+        f"Processed snapshots considered: {len(rows)}",
+        f"Unprocessed snapshots ignored: {ignored_unprocessed}",
         f"Assignment windows: {len(windows)}",
         f"Structured cases: {len(cases)}",
         f"Published events: {sum(bool(event.get('visible')) for event in events)}",
-        f"Raw snapshots read: {len(raw)}",
+        f"Raw snapshots examined: {len(raw)}",
+        f"Raw section-index cache: {projection_cache['hit']} reused / {projection_cache['built']} built / {projection_cache['raw-no-index']} unsupported",
         f"Cache: {cache_counts.get('hit', 0)} hit / {cache_counts.get('extend', 0)} extend / {cache_counts.get('miss', 0)} miss",
         "",
         "CASES",

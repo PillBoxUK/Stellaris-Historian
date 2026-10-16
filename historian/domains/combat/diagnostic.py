@@ -61,21 +61,13 @@ def _starbase_activity_evidence(
 def combat_evidence_summary(snapshots: list[CombatSnapshot]) -> dict[str, int]:
     war_ids: set[int] = set()
     battle_keys: set[str] = set()
-    victories = 0
-    defeats = 0
-
-    seen_result: set[str] = set()
     for snapshot in snapshots:
         war_ids.update(snapshot.wars)
-        for key, battle in snapshot.battles.items():
-            battle_keys.add(key)
-            if key in seen_result:
-                continue
-            seen_result.add(key)
-            if battle.player_victory is True:
-                victories += 1
-            elif battle.player_victory is False:
-                defeats += 1
+        battle_keys.update(snapshot.battles)
+    # These are unverified tactical outcome flags, not confirmed player results.
+    victories = 0
+    defeats = 0
+    results_under_review = len(battle_keys)
 
     ship_evidence = _ship_activity_evidence(snapshots)
     starbase_evidence = _starbase_activity_evidence(snapshots)
@@ -109,6 +101,7 @@ def combat_evidence_summary(snapshots: list[CombatSnapshot]) -> dict[str, int]:
         "battles": len(battle_keys),
         "victories": victories,
         "defeats": defeats,
+        "results_under_review": results_under_review,
         "ship_activity_markers": len(ship_evidence),
         "starbase_activity_markers": len(starbase_evidence),
         "ships_with_activity": len({state.ship_id for _, state in ship_evidence}),
@@ -157,8 +150,8 @@ def write_combat_diagnostic(
         f"Latest snapshot: {latest_game_date}",
         f"Player-related formal war episodes observed: {summary['wars']}",
         f"Unique direct player formal battle records: {summary['battles']}",
-        f"Recorded formal-battle victories: {summary['victories']}",
-        f"Recorded formal-battle defeats: {summary['defeats']}",
+        f"Formal battle results under review: {summary['results_under_review']}",
+        "Confirmed player victories/defeats: withheld pending attacker_victory interpretation",
         f"Unique ship combat-activity markers: {summary['ship_activity_markers']} across {summary['ships_with_activity']} ship(s)",
         f"Unique starbase combat-activity markers: {summary['starbase_activity_markers']} across {summary['starbases_with_activity']} starbase(s)",
         f"Relation kill-counter counterparts observed: {summary['relation_counterparts']} across {summary['relation_counter_snapshots']} snapshot(s)",
@@ -319,11 +312,7 @@ def write_combat_diagnostic(
             battle_by_key.values(),
             key=lambda item: (_date_key(item.date), item.war_id, item.battle_index),
         ):
-            result = (
-                "Victory" if battle.player_victory is True
-                else "Defeat" if battle.player_victory is False
-                else "Result not recorded"
-            )
+            result = "Outcome under review" if battle.attacker_victory is not None else "Outcome not recorded"
             location = battle.system_name or battle.planet_name or "Location not resolved"
             if battle.planet_name and battle.system_name:
                 location = f"{battle.planet_name} / {battle.system_name}"
@@ -332,7 +321,8 @@ def write_combat_diagnostic(
                 f"{battle.date} - {result}",
                 f"  War ID: {battle.war_id}",
                 f"  Type: {battle.battle_type}",
-                f"  Player side: {battle.player_side}",
+                f"  Tactical player role: {battle.player_side}",
+                f"  Raw attacker_victory: {battle.attacker_victory}",
                 f"  Location: {location}",
                 f"  Player losses: {_fmt_losses(battle.player_losses)}",
                 f"  Opposing losses: {_fmt_losses(battle.enemy_losses)}",

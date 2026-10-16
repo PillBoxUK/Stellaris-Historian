@@ -229,13 +229,7 @@ def _combat_timeline_event(event: HistoricalEvent, empire_name: str) -> Timeline
         else:
             parts.append("The surviving retained fleet tallies record no vessel losses for either side.")
 
-    outcome = attrs.get("formal_outcome")
-    if outcome == "victory":
-        parts.append(f"A surviving formal battle record establishes a {force_name} victory.")
-    elif outcome == "defeat":
-        parts.append(f"A surviving formal battle record establishes a {force_name} defeat.")
-    else:
-        parts.append("No surviving record establishes victory or defeat.")
+    parts.append("Formal battle results remain under review; no player victory or defeat is established.")
 
     return TimelineEvent(
         game_date=event.game_date,

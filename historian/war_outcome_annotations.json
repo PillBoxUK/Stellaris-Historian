@@ -1,0 +1,22 @@
+[
+  {
+    "empire": "Commonwealth of Man",
+    "war_id": 83886080,
+    "start_date": "2293.04.26",
+    "result": "Commonwealth victory",
+    "notification_date": "2300.08.15",
+    "source": "player-supplied in-game victory notification screenshot, dated 2300.08.15",
+    "details": "Hulfiran United Stars humiliated; game notification lists 8 systems and 2 planets gained and an influence award of 100. This is notification evidence, not raw treaty data.",
+    "reference": "screenshot 20261016-005142"
+  },
+  {
+    "empire": "Commonwealth of Man",
+    "war_id": 100663296,
+    "start_date": "2301.06.12",
+    "result": "Commonwealth victory",
+    "notification_date": "2303.02.14",
+    "source": "player-supplied in-game victory notification screenshot, dated 2303.02.14",
+    "details": "Silicron Interface defeat; victory notice names Qeffoth I and the Qeffoth system among Commonwealth gains. The subsequent game event reports the former star nation destroyed. Do not infer other settlement terms.",
+    "reference": "screenshot 20261016-011016"
+  }
+]

@@ -1152,6 +1152,39 @@ th{{
     page-break-inside:avoid;
   }}
 }}
+/* v0.0.63: screen-wide midnight journal palette, shared by ships, worlds and people.
+   Paper print rules below remain authoritative for PDF/printing. */
+@media screen {{
+  :root {{ --ink:#e7eff7; --muted:#b7c9db; --paper:#152337; --paper2:#22364c; --line:#415b73; --gold:#d5ac70; --dark:#0c1520; }}
+  body {{ background:#0b1420; }}
+  main {{ border-inline:1px solid #31485f; }}
+  header {{ background:linear-gradient(180deg,#101820,#1d3045); }}
+  .journal-nav {{ background:rgba(12,20,30,.97);border-color:#38516b; }}
+  .journal-nav-links a,.journal-nav button,.journal-nav .timeline-button,.journal-nav .scribes-button {{ color:#e8eff7;border-color:#45627c; }}
+  section h2 {{ border-color:#66839a; }}
+  section h3,.chronicle-event h3 {{ color:#eff5fb; }}
+  .stat,.facts div {{ background:#253a51; border-color:#3f5871; }}
+  .origin-lore {{ background:#23384c; border-color:#d5ac70; }}
+  .origin-kicker,.chronicle-event .date {{ color:#f0c88d; }}
+  .chronicle-event {{ background:#1c3045; border-color:#405b73;border-left-color:#d5ac70; }}
+  .people-event {{ border-left-color:#c5a5ea; }}
+  .world-event {{ border-left-color:#80c69e; }}
+  .science-event {{ border-left-color:#85bdf0; }}
+  .story-arc {{ background:linear-gradient(135deg,#213951,#283e53); }}
+  table {{ background:#192b3e; }}
+  th {{ background:#314962;color:#f2f6fc; }}
+  td,th {{ border-bottom-color:#40576e; }}
+  tbody tr:nth-child(even) {{ background:#21364b; }}
+  tbody tr:hover {{ background:#304b65; }}
+  .note,.evidence,.origin-source {{ color:#b7c9db; }}
+  a {{ color:#9ccfff; }}
+  .table-scroll {{ max-width:100%; overflow-x:auto; }}
+  #ships-fleets table {{ min-width:780px; }}
+  #ships-fleets .table-scroll {{ border:1px solid #405b73; border-radius:5px; }}
+  #ships-fleets th {{ position:sticky;top:0;z-index:1; }}
+  #ships-fleets .chronicle-event {{ margin-block:10px; }}
+  :focus-visible {{ outline:2px solid #9ccfff; outline-offset:2px; }}
+}}
 </style>
 </head>
 

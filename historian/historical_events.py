@@ -126,12 +126,7 @@ def _combat_episode_event(episode: CombatEpisode) -> HistoricalEvent | None:
                 f"and {initial.enemy_ships_lost} opposing loss(es)."
             )
 
-    if episode.formal_outcome == "victory":
-        details.append("A formal battle record establishes victory for the tracked force.")
-    elif episode.formal_outcome == "defeat":
-        details.append("A formal battle record establishes defeat for the tracked force.")
-    else:
-        details.append("No victory or defeat is established by the retained episode evidence.")
+    details.append("Formal battle outcome remains under review; surviving evidence does not yet establish a player victory or defeat.")
 
     if episode.possible_loss_names:
         details.append(
