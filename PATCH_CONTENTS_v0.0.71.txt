@@ -1,0 +1,36 @@
+Stellaris Historian v0.0.71 - Research Date Integrity & Evidence Audit
+
+CLASSIC FLAT PATCH: same structure as v0.0.70 and previous patch ZIPs.
+Files and folders in this ZIP are relative to the HISTORIAN INSTALL ROOT.
+Do NOT extract or install into StellarisHistorian_GitHubMerge.
+
+INSTALLATION
+1. In Historian, wait for history processing to finish, turn Live History OFF, and close Historian fully.
+2. Back up the existing files you are going to replace (or use your established autobackups workflow).
+3. Extract this ZIP into G:\codex\StellarisHistorian and allow matching files to be replaced.
+   If you extract it to a staging folder first, copy the contents (not the staging folder)
+   into G:\codex\StellarisHistorian, keeping the same historian/, docs/, static/ paths.
+4. Start Historian with G:\codex\StellarisHistorian\start.bat.
+5. Verify app version 0.0.71 and the War Journal Research Evidence Audit.
+
+IMPORTANT
+- This classic flat patch deliberately has no APPLY_PATCH.bat or payload wrapper.
+- These are exactly the same v0.0.71 application payload files as the earlier wrapped ZIP.
+- Your data/, .sav, SQLite, caches, .venv, config, Git history and autobackups are not included.
+- No database migration or archive rebuild is needed.
+- Historian MUST be restarted after applying this patch.
+- The optional local regression test is: ".venv\Scripts\python.exe" test_v0_0_71.py
+- Do NOT use the earlier v0.0.71_Update/APPLY_PATCH.bat package as well.
+
+PATCH FILES:
+  historian/__init__.py
+  historian/domains/technology/history.py
+  historian/domains/technology/diagnostic.py
+  historian/war_journal.py
+  historian_manifest.json
+  start.bat
+  README.md
+  docs/CHANGELOG.md
+  documentation/release_notes/README_v0.0.71.md
+  test_v0_0_71.py
+  README_v0.0.71.md

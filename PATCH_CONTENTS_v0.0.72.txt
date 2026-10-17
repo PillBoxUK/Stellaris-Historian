@@ -1,0 +1,44 @@
+STELLARIS HISTORIAN v0.0.72 — CLASSIC FLAT PATCH
+===============================================
+Based on v0.0.71.1 (save-only war evidence), incorporating v0.0.71 research integrity.
+
+NEW: Empire Archive — fast, SQLite-only, searchable non-war history.
+Leadership service records, worlds/colonies, individual ships/fleets,
+politics/diplomacy, foundational event chronology, provenance and year filters,
+optional technical evidence and local CSV/JSON exports.
+
+NO: save reparsing, database migrations, schema or parser-cache changes,
+war evidence changes, Live History pipeline changes or cloud services.
+No backup, cache, database, Ironman save, config or credentials in this ZIP.
+
+INSTALL (original format — no wrapper directory):
+1. Wait for the archive to catch up. Turn Live History OFF and close Historian.
+2. Make a safety copy of any existing files you will overwrite.
+3. Extract this ZIP into G:\codex\StellarisHistorian, preserving paths;
+   allow application files of identical names to overwrite.
+4. Restart using the ORIGINAL main-folder start.bat.
+5. Click Empire Archive on the campaign dashboard (wait until processed=archived).
+   The archive can also be opened locally from <campaign>/Empire_Archive.html.
+
+KNOWN LIMITATIONS:
+- This view exposes evidence currently stored in the SQLite database, not all
+  possible raw-game fields. Records not yet parsed cannot appear.
+- Saved-game first/last observation is not exact birth, demise, battle outcome,
+  ship destruction or founding unless a separate source establishes it.
+- Planet population is the latest retained value, not a time series.
+- Dedicated technology/science and First Contact dossiers are still planned.
+- War Journal remains at its v0.0.71.1 evidence rules; no manual screenshots.
+
+FILES:
+ - README.md
+ - app.py
+ - docs/CHANGELOG.md
+ - documentation/release_notes/README_v0.0.72.md
+ - historian/__init__.py
+ - historian/empire_archive.py
+ - historian_manifest.json
+ - start.bat
+ - static/campaign.html
+ - static/campaign.js
+ - test_v0_0_68.py
+ - test_v0_0_72.py

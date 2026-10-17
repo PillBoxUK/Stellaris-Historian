@@ -1,3 +1,16 @@
+## v0.0.80 — Machine-empire first-year repairs
+
+**v0.0.82 — The Great Chronicle Rebuild:** A narrative-first founding chapter grounded in opening Ironman species/origin fields; native campaign milestones and dated war victories; direct war-level exhaustion evidence; one backed-up Update Historical Timeline action to re-derive history using versioned caches. Running a full rebuild may take several minutes or more on a large campaign.
+
+The Imperial Annals now formats Stellaris leader gender-name alternatives correctly (including already indexed names), removes duplicate ship/Ancient Capsule project entries, writes machine-state introductions without human political assumptions, and keeps raw research totals out of the main narrative. Existing research progress stays in Research History. These are non-destructive rendering and low-cost ingest fixes. **Popup-only Shroud choices are not automatically recoverable from quarterly snapshots:** no selection or outcome is invented.
+
+## v0.0.79 — Evidence-first research queues and fuller timeline prose
+
+See `documentation/release_notes/README_v0.0.79.md` for the independent research-ledger and rewrite instructions.
+
+## NEW in v0.0.78 — The Imperial Annals Rewritten
+The campaign's **Manage Campaign** menu now includes **Use Game Texts** and **Rewrite Timeline**. Point the former at your local Stellaris installation folder to retrieve English project descriptions, then run the latter while Live History is OFF. Rewrite Timeline inspects every archived save metadata header and existing parsed cache without deleting databases, resets, or Ironman saves. It then regenerates the readable chronology. See `documentation/release_notes/README_v0.0.78.md` for details.
+
 # Stellaris Historian
 
 Stellaris Historian is a local companion application for **Stellaris** that watches Ironman save files and builds a historical record of your empire over time.
@@ -6,17 +19,63 @@ It is designed to turn a campaign into a living historical archive rather than j
 
 ## Current version
 
+## Current release: v0.0.90 — The Readable Annals
+
+A source-only editorial upgrade to the Imperial Annals: Highlights/Standard/Complete reading modes, month and year source-based extracts, explicit source-date labels, safer linked person/war chronologies, personal notes and pins isolated in the browser, selected-year HTML exports and new roadmap. No changes to the Ironman archives, databases, parser or worker. See [v0.0.90 release notes](docs/RELEASE_v0.0.90.md) and [the development roadmap](roadmap/ROADMAP.md). Historian must be restarted with `start.bat`; Stellaris need not be restarted.
+
+
+### v0.0.77 — The Living Annals (approved timeline concept)
+
+The canonical `/timeline` is now rebuilt in the approved parchment-and-starfield design. Every record passes through date-aware narrative logic: people entering service are separate from later observed assignments; major named ships are commissioned on verified dates and first-observed fleet postings appear on their own archived dates; battles are recounted as campaigns, with named systems, formations, commanders and retained aggregate losses, rather than a technical audit. War beginnings are individual clickable entries as well as multi-year bands. Historical qualifications, first-observation bounds, data-source identifiers and unconfirmed outcomes belong on the **back of a floating card**, never in a fabricated narrative. No made-up ship destruction, withdrawal, or survivor-return claims.
+
+The design remains locally rendered from the current Historian SQLite archive. It includes clickable war/leader links, date jump, category filters, print output, and draggable/flippable details. No migration or save reprocessing required. See [v0.0.77 notes](documentation/release_notes/README_v0.0.77.md).
+
+### v0.0.76 — Fleet Rolls, Story Threads & CSS Stability
+
+The Empire Timeline now draws additional named major-vessel histories from the already-indexed ship registry, with first-sighting fleet/commander assignments only; previously recorded construction dates are distinguished from the later assignment observation. Recorded scientific situations and special projects enter a new **Story** category, but it does not fabricate event decisions or plot conclusions. Ruler/government-era voice changes are purely stylistic; volunteering, enlistment and motives are never inferred. The dashboard stylesheet has a new cache key and library/control layout fixes. No schema migration, Ironman reprocessing or private data changes. See [v0.0.76 notes](documentation/release_notes/README_v0.0.76.md).
+
+### v0.0.75 — The Imperial Annals
+
+The classic vertical Empire Timeline is now the primary chronology. Multi-year war rails run alongside the event list; event and war detail cards can open, flip, move, and link into the Empire Archive and War Journal. The timeline uses historical rather than player/debug narration and displays archived observation bounds without fabricating peace dates. The previous standalone Interactive Timeline has been retired from the interface and its bookmarked route redirects to `/timeline` (its internal evidence code remains available to the Time Machine). The campaign dashboard now has three simple top controls: Live History, Explore History and Manage Campaign. All existing archive views remain accessible in the Observatory. See [v0.0.75 release notes](documentation/release_notes/README_v0.0.75.md). No migration, save reprocessing or SQLite changes.
+
+
+### v0.0.74 — Galactic Observatory: Time Machine & Nine-Chapter Scribes Chronicle
+
+A large presentation and historical-provenance milestone. The **Empire Time Machine** steps through actual **processed archive dates**, with a date slider, playback, filtering, event dossiers and optional JSON export. It uses the existing reviewed timeline history plus durable SQLite government/ruler observations and first/last registry sighting windows; it **never presents those windows or latest attributes as a real-time historic census**. The Scribes Chronicle gains a dramatic astronomy-inspired cover (including in PDF), chapter contents and anchors, night reading mode, reading progress, a new **Chambers of Power** chapter based on published political history, and corrections for stale empire naming, colony founding/acquisition distinctions and supposed ruler signatures. The dashboard includes a Historical Observatory for all six local history views. **No database migration, cache invalidation, source-save rewrite, or Live History pipeline modification.** See [release notes](documentation/release_notes/README_v0.0.74.md).
+
+
+### v0.0.73 — Interactive Empire Timeline
+
+Use the dashboard **Timeline** button to open a fully interactive archive: play or drag through evidence-backed dates, search, choose event categories, inspect dated records with provenance, and export filtered data. Ground battles, federation and Galactic Community entries remain empty where the current save-derived history has not established them; the empire's internal council agenda is labelled separately. The existing printable PDF timeline stays available. This reads durable SQLite records, reviewed cached history and the existing First Contact JSON without re-opening game saves or changing Live History. See [v0.0.73 release notes](documentation/release_notes/README_v0.0.73.md).
+
+
+### v0.0.72 — Empire Archive: Leaders, Worlds, Navy and Diplomacy
+
+Adds an evidence-first, searchable **Empire Archive** separate from the War Journal. From the campaign dashboard, open a fast local record browser for the chronology, leadership careers, colonised worlds, fleets, individual ships and diplomacy. Browse record details with source dates, known observations and linked events; filter by year/search terms and optionally include technical events. CSV and JSON exports are generated in the browser. **Only pre-existing SQLite records are read**: no new raw save parsing, database migration, schema/cache invalidation or Live History slowdown. No screenshot annotations. See [v0.0.72 release notes](documentation/release_notes/README_v0.0.72.md).
+
+
+### v0.0.71.1 — Save-Only War Journal Evidence
+
+Removes the use of manually supplied screenshots and hard-coded outcome/name annotations from the War Journal and downloaded war briefs. Names are displayed only when recovered from native war records or the independently parsed diplomatic/combat caches. Outcomes not established by save evidence are left unverified, and end dates remain bounded by archive observations. The legacy annotation JSON files can remain on disk; this update no longer reads them. No saves, databases, archive caches or Live History processing are changed. See [v0.0.71.1 notes](documentation/release_notes/README_v0.0.71.1.md).
+
+
+### v0.0.71 — Research Date Integrity & Wartime Coverage
+
+Same-day Ironman snapshots now contribute one observation day to the completed-technology evidence ledger: no more impossible `after X and by X` acquisition intervals. Research progression uses an observed high-water level so a partially missing cache cannot imply that completed research was lost and re-acquired. The War Journal labels technology archive coverage and first-war boundary overlaps, and its TXT briefs retain those evidence caveats. The technology diagnostic reports duplicate-date and disagreement statistics. **No database migrations, save reparsing, cache version changes, or Live History processing changes.** See [v0.0.71 release notes](documentation/release_notes/README_v0.0.71.md).
+
+
+
 ### v0.0.70 — War Journal Navigation, Evidence Dossiers & Wartime Research
 
-A larger War Journal usability and historical-evidence release: chronological jump index; bookmarkable per-war URLs; previous/next war navigation at both ends of each report; compact dated war chronologies and annual battle ledger; theatre-to-battle shortcuts; evidence-aware text dossier copy/download; collapsible investigation tables; and completed technologies first observed during each war using existing technology caches. Maintains v0.0.69 victory screenshot provenance and unverified exhaustion handling. **No SQLite schema changes, no save reparsing, and no revision to Live History processing.** See [README_v0.0.70.md](README_v0.0.70.md).
+A larger War Journal usability and historical-evidence release: chronological jump index; bookmarkable per-war URLs; previous/next war navigation at both ends of each report; compact dated war chronologies and annual battle ledger; theatre-to-battle shortcuts; evidence-aware text dossier copy/download; collapsible investigation tables; and completed technologies first observed during each war using existing technology caches. Maintains v0.0.69 victory screenshot provenance and unverified exhaustion handling. **No SQLite schema changes, no save reparsing, and no revision to Live History processing.** See [README_v0.0.70.md](documentation/release_notes/README_v0.0.70.md).
 
 ### v0.0.69 — War Chronicle Verification and Progress
 
-Adds screenshot-sourced victory notifications for the two verified Commonwealth wars, provenance-aware end windows, honest war-exhaustion labels, per-battle fatigue-field evidence, and a responsive background ground/starbase investigator with live progress and reuse of v0.0.68 military indexes. **Normal Live History and research-technology acquisition tracking are unchanged.** See [README_v0.0.69.md](README_v0.0.69.md).
+Adds screenshot-sourced victory notifications for the two verified Commonwealth wars, provenance-aware end windows, honest war-exhaustion labels, per-battle fatigue-field evidence, and a responsive background ground/starbase investigator with live progress and reuse of v0.0.68 military indexes. **Normal Live History and research-technology acquisition tracking are unchanged.** See [README_v0.0.69.md](documentation/release_notes/README_v0.0.69.md).
 
 ### v0.0.68 — Military History Evidence
 
-Adds enemy-aware war titles, on-demand ground-battle and occupation analysis, and enemy-starbase combat-activity evidence without changing live-save processing or the database. See [README_v0.0.68.md](README_v0.0.68.md) for limitations and installation.
+Adds enemy-aware war titles, on-demand ground-battle and occupation analysis, and enemy-starbase combat-activity evidence without changing live-save processing or the database. See [README_v0.0.68.md](documentation/release_notes/README_v0.0.68.md) for limitations and installation.
 
 
 ### v0.0.54 — Processed Combat Diagnostic Synchronization
@@ -45,7 +104,11 @@ v0.0.54 fixes a live-testing gap exposed during the Commonwealth of Man / Hulfir
 
 | Version | Main change | Status |
 | --- | --- | --- |
-| **v0.0.54** | Processed-only combat diagnostic synchronization and presentation cache gating | Current development version |
+| **v0.0.72** | Searchable multi-domain Empire Archive with record inspections, source evidence and exports | Current development version |
+| **v0.0.71.1** | Save-only War Journal facts and evidence provenance | Retained |
+| **v0.0.71** | Research-date integrity, War Journal coverage and evidence-aware TXT briefs | Retained |
+| **v0.0.70** | Navigation, wartime research and war evidence dossiers | Retained |
+| **v0.0.54** | Processed-only combat diagnostic synchronization and presentation cache gating | Retained |
 | **v0.0.53** | Queue-first Live History processing plus per-domain performance telemetry | Retained |
 | **v0.0.52** | Dedicated evidence-led War Journal separating formal wars from combat episodes | Tested and retained |
 | **v0.0.51** | Unmistakable manual workflow completion/error banner in the CMD window | Tested and retained |
@@ -76,6 +139,7 @@ For the full code-level history, see [`docs/CHANGELOG.md`](docs/CHANGELOG.md).
 - Tracks colonies/worlds, founding evidence, population snapshots, designation and ownership changes.
 - Tracks archaeology, special projects, situations and other science/exploration evidence conservatively.
 - Tracks direct combat telemetry, exact ship combat-activity markers, combat correlations and synthesized combat episodes.
+- Generates a searchable, non-war **Empire Archive** for leaders, worlds, fleets, ships, politics and diplomacy.
 - Generates a dedicated **War Journal** that keeps formal wars separate from non-war combat episodes and preserves evidence confidence/loss semantics.
 - Tracks structured Politics/Diplomacy evidence including government, authority, ruler, council agendas, traditions and diplomatic relation-state changes.
 - Decodes structured First Contact cases by linking leader `first_contact_system` assignments to `first_contacts.contacts.<id>` save records.
@@ -104,6 +168,7 @@ Historian currently produces or maintains outputs including:
 
 - `Historical_Journal.html` — detailed evidence-backed campaign history.
 - `War_Journal.html` — dedicated military-history view separating formal wars from reconstructed combat episodes.
+- `Empire_Archive.html` — evidence-led searchable leader, world, fleet, ship and diplomacy records.
 - Empire Timeline — chronological view of major historical events.
 - Scribes Chronicle — flowing narrative presentation of the campaign.
 - `historian.db` — local SQLite historical state.
@@ -159,7 +224,7 @@ Then restart Stellaris Historian when an update includes application code, migra
 
 Historian uses small versioned migrations for changes that need to update release metadata or local application state. Migration logs are written under `logs` and migration markers are stored under `data`.
 
-v0.0.54 adds cache-only combat diagnostic synchronization after History catch-up and restricts cached presentation evidence to processed snapshots. It does **not** change the SQLite schema or parsed-cache component versions, so no full cache rebuild is required.
+v0.0.71 adds conservative completed-technology date grouping and coverage reporting; v0.0.54 added cache-only combat diagnostic synchronization after History catch-up and restricts cached presentation evidence to processed snapshots. It does **not** change the SQLite schema or parsed-cache component versions, so no full cache rebuild is required.
 
 ## Data and privacy
 

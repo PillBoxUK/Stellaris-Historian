@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 chcp 65001 >nul
-title Stellaris Historian v0.0.70
+title Stellaris Historian v0.0.90
 
 cls
 if exist "assets\stellaris_banner.txt" (
@@ -15,7 +15,7 @@ if exist "assets\stellaris_banner.txt" (
     echo.
 )
 echo ==========================================
-echo        STELLARIS HISTORIAN v0.0.70
+echo        STELLARIS HISTORIAN v0.0.90
 echo ==========================================
 echo.
 

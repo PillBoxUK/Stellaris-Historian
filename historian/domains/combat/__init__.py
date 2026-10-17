@@ -1,7 +1,7 @@
 """Combat domain: evidence-first war, battle and exact combat-activity reconstruction."""
 
 CACHE_COMPONENT_NAME = "combat"
-CACHE_COMPONENT_VERSION = 3
+CACHE_COMPONENT_VERSION = 4
 
 from .models import (
     BattleState,

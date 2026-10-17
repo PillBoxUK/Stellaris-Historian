@@ -1,0 +1,162 @@
+/* Stellaris Historian — shared presentation layer v0.0.87.
+   Site-only styling: never touches or interprets saved campaign evidence. */
+html[data-historian-theme="dark"]{
+  color-scheme:dark;
+  --sh-bg:#080f15;--sh-surface:#101d27;--sh-surface2:#172a35;
+  --sh-line:#2b4b59;--sh-text:#e5f4f5;--sh-muted:#a0bec6;
+  --sh-cyan:#71dce9;--sh-green:#81e7c2;--sh-link:#91e8ee;
+  --bg:var(--sh-bg);--back:var(--sh-bg);--paper:var(--sh-bg);
+  --panel:var(--sh-surface);--paper2:var(--sh-surface2);--panel2:var(--sh-surface2);--card:var(--sh-surface);--card2:var(--sh-surface2);
+  --line:var(--sh-line);--edge:var(--sh-line);--border:var(--sh-line);
+  --ink:var(--sh-text);--text:var(--sh-text);--muted:var(--sh-muted);--sub:var(--sh-muted);--faded:var(--sh-muted);
+  --gold:var(--sh-cyan);--accent:var(--sh-cyan);--cyan:var(--sh-cyan);--teal:var(--sh-green);
+}
+html[data-historian-theme="light"]{
+  color-scheme:light;
+  --sh-bg:#f1f7f8;--sh-surface:#fff;--sh-surface2:#e9f1f3;
+  --sh-line:#b1cbd0;--sh-text:#172e38;--sh-muted:#465f6a;
+  --sh-cyan:#006e83;--sh-green:#11735d;--sh-link:#006e83;
+  --bg:var(--sh-bg);--back:var(--sh-bg);--paper:var(--sh-bg);
+  --panel:var(--sh-surface);--paper2:var(--sh-surface2);--panel2:var(--sh-surface2);--card:var(--sh-surface);--card2:var(--sh-surface2);
+  --line:var(--sh-line);--edge:var(--sh-line);--border:var(--sh-line);
+  --ink:var(--sh-text);--text:var(--sh-text);--muted:var(--sh-muted);--sub:var(--sh-muted);--faded:var(--sh-muted);
+  --gold:var(--sh-cyan);--accent:var(--sh-cyan);--cyan:var(--sh-cyan);--teal:var(--sh-green);
+}
+html[data-historian-theme] body{background:var(--sh-bg);color:var(--sh-text)}
+html[data-historian-theme] :where(a){color:var(--sh-link)}
+html[data-historian-theme] :where(button, select, input, textarea){font:inherit}
+html[data-historian-theme] :where(button, input, select, textarea):focus-visible,
+html[data-historian-theme] :where(a, summary):focus-visible{outline:3px solid var(--sh-cyan);outline-offset:3px}
+html[data-historian-theme] :where(button, input, select, textarea){accent-color:var(--sh-cyan)}
+html[data-historian-theme] :where(button,select,input,textarea){border-radius:6px}
+/* HTML pages have their own positioning and narrative typography, retained here. */
+html[data-historian-theme] :where(.topbar,.filterbar,.campaign-topbar,header.mast,header.top,header:not(.hero),nav:not(.campaign-top-actions)){
+  border-color:var(--sh-line);
+}
+html[data-historian-theme] :where(.kicker,.eyebrow,.supertitle){color:var(--sh-cyan)}
+html[data-historian-theme] :where(.muted,.meta,.note,.event-summary,.section-context,.intro,.chart-note){color:var(--sh-muted)}
+html[data-historian-theme] :where(.historian-project-footer,.historian-footer,footer){border-color:var(--sh-line);color:var(--sh-muted)}
+html[data-historian-theme] :where(.historian-project-footer a,.historian-footer a){color:var(--sh-link)}
+html[data-historian-theme] :where(.historian-project-footer strong,.historian-footer strong){color:var(--sh-text)}
+html[data-historian-theme] :where(.tag,.event-kind){border-color:var(--sh-line)}
+/* Universal theme buttons follow the main site and explain their current state in words. */
+.historian-theme-toggle{flex:0 0 auto!important;white-space:nowrap!important;display:inline-flex!important;
+  align-items:center!important;gap:8px!important;border:1px solid var(--sh-line)!important;
+  border-radius:7px!important;padding:10px 13px!important;background:var(--sh-surface2)!important;
+  color:var(--sh-text)!important;font:700 12px/1.2 system-ui,sans-serif!important;cursor:pointer!important}
+.historian-theme-toggle:hover{border-color:var(--sh-cyan)!important}
+.historian-theme-toggle:focus-visible{outline:3px solid var(--sh-cyan)!important;outline-offset:3px!important}
+@media(max-width:860px){.historian-theme-toggle{padding:9px 11px!important}}
+/* The Imperial Annals is the canonical long-form reading view. Preserve layout and serif prose. */
+html[data-historian-theme="dark"] body:has(.chronicle){background:#09131b!important;color:#e0f1ef!important}
+html[data-historian-theme="dark"] :where(.topbar,.filterbar){background:#10212cf5!important;border-color:#335463!important}
+html[data-historian-theme="dark"] :where(.topbar a,.topbar button,.topbar .jump-year,.filterbar button){background:#1a2c37!important;color:#dcf1f4!important;border-color:#3c6370!important}
+html[data-historian-theme="dark"] :where(.topbar a:hover,.topbar button:hover,.filterbar button:hover){background:#24434e!important}
+html[data-historian-theme="dark"] .filterbar button.active{background:#196178!important;color:#fff!important}
+html[data-historian-theme="dark"] .hero{background:radial-gradient(ellipse at 75% 0%,#204451,transparent 55%),#101d29!important;color:#e6faf7!important}
+html[data-historian-theme="dark"] .year{border-color:#2b4852!important}
+html[data-historian-theme="dark"] .year-heading span{color:#84d9e5!important}
+html[data-historian-theme="dark"] .year-heading:after{background:#35545e!important}
+html[data-historian-theme="dark"] .events{border-left-color:#50818b!important}
+html[data-historian-theme="dark"] .event:before{border-color:#0b1a22!important}
+html[data-historian-theme="dark"] :where(.event-main,.people-note){background:#142630!important;border-color:#335461!important;box-shadow:none!important}
+html[data-historian-theme="dark"] .people-note{background:#1b3038!important}
+html[data-historian-theme="dark"] :where(.event-open strong,.people-note strong){color:#e2f4f2!important}
+html[data-historian-theme="dark"] .event-summary{color:#bfd5d9!important}
+html[data-historian-theme="dark"] :where(.event .date,.event-open small,.people-note .people-heading,.people-note span){color:#84cfdb!important}
+html[data-historian-theme="dark"] .tag{border-color:#42606d!important;color:#aacbd0!important}
+html[data-historian-theme="dark"] .milestone-tag{background:#254339!important;border-color:#4c9985!important;color:#9df4d7!important}
+html[data-historian-theme="dark"] .floating{background:#142731!important;color:#e2f4f2!important;border-color:#4b7280!important}
+html[data-historian-theme="dark"] .floating-header{background:#12303d!important;color:#e2f7f7!important}
+html[data-historian-theme="dark"] :where(.floating-content h2,.floating-content p,.floating-content .back,.floating-content .back p){color:#d3e7ea!important}
+html[data-historian-theme="dark"] .floating-content .detail-link{background:#1d3e4b!important;color:#b8edf0!important;border-color:#4b7782!important}
+html[data-historian-theme="dark"] .war-track{border-color:#3c626b!important}
+html[data-historian-theme="dark"] .war-period{background:#29363a!important;color:#f0e1c7!important}
+html[data-historian-theme="dark"] .war-period .war-dates{color:#c7c1b6!important}
+/* Light theme is complete even for pages which predate theme support and were dark-only. */
+html[data-historian-theme="light"] :where(body,.book){background:#f1f7f8!important;color:#172e38!important}
+html[data-historian-theme="light"] :where(header,.mast,.topbar,.filterbar,nav:not(.campaign-top-actions)){background:#e4f0f3!important;border-color:#b6cdd2!important;color:#17323d!important}
+html[data-historian-theme="light"] :where(.hero,.mast .hero){background:#d8e9ed!important;color:#17323d!important}
+html[data-historian-theme="light"] :where(.hero h1,.mast h1){color:#17323d!important}
+html[data-historian-theme="light"] :where(.panel,.metric,.data-card,.section,.event-main,.people-note,.item,.card,.fact,.stat,.entry,.archive-card,.world-panel,.gov-panel,.note,.summary,.floating,.detail,.record,.date-box,.book,.chapter,.preface){background:#fff!important;color:#17323d!important;border-color:#b7cdd1!important;box-shadow:none!important}
+html[data-historian-theme="light"] :where(.event-open strong,.event-summary,.people-note strong,.people-note span,.floating-content h2,.floating-content p,.event strong,.metric b,.panel h2,.panel h3,.year-heading span,.floating-content .back){color:#214250!important}
+html[data-historian-theme="light"] :where(.topbar a,.topbar button,.topbar .jump-year,.filterbar button,nav a,button,input,select,textarea){background:#f7fbfc!important;color:#174050!important;border-color:#a3c2ca!important}
+html[data-historian-theme="light"] .filterbar button.active{background:#166b7d!important;color:#fff!important}
+html[data-historian-theme="light"] :where(.tag,.event-kind){background:#e4f1f3!important;color:#286278!important;border-color:#a3c4cb!important}
+html[data-historian-theme="light"] .milestone-tag{background:#e0f5ee!important;color:#126a56!important}
+html[data-historian-theme="light"] :where(.floating-header,.historian-footer,footer){background:#dcebee!important;color:#204656!important}
+html[data-historian-theme="light"] :where(.floating-header button){color:#173a47!important;background:#fff!important}
+html[data-historian-theme="light"] .war-period{background:#e4f3f3!important;color:#224855!important}
+html[data-historian-theme="light"] .event:before{border-color:#eff7f8!important}
+html[data-historian-theme="light"] :where(.chart .plot-axis,.chart-note,.muted,.meta,.note){color:#496773!important}
+/* Read-only database tables must remain legible in either theme. */
+html[data-historian-theme="light"] :where(th,td,pre,code,table,aside,dialog){background-color:#f6fbfc;color:#17323d;border-color:#c0d2d7}
+html[data-historian-theme="dark"] :where(.historian-project-footer){background:#0a151c}
+/* Keep recording warnings and errors high contrast, never expressed only by colour. */
+html[data-historian-theme="light"] .recording-guard-backdrop{background:rgba(3,10,17,.82)!important}
+html[data-historian-theme="light"] .recording-guard-panel{background:#f7fbfc!important;color:#172e38!important;border-color:#368494!important}
+html[data-historian-theme="light"] .recording-guard-panel h2{color:#153842!important}
+html[data-historian-theme="light"] .recording-guard-civilisation{background:#e2f4f2;color:#135b5b}
+html[data-historian-theme="light"] .recording-guard-caution{background:#fff4e9;color:#452f19}
+html[data-historian-theme="light"] .recording-guard-footnote{color:#496875}
+html[data-historian-theme="light"] .recording-guard-yes{background:#15745f!important;color:#fff!important}
+html[data-historian-theme="light"] .recording-guard-no{background:#67343c!important;color:#fff!important}
+/* Printing keeps clean, white paper regardless of on-screen choice. */
+@media print{
+  html[data-historian-theme] {color-scheme:light!important}
+  html[data-historian-theme] body,html[data-historian-theme="dark"] body:has(.chronicle){background:#fff!important;color:#222!important}
+  html[data-historian-theme] :where(.panel,.event-main,.people-note,.book,.chapter,.preface,.metric,.hero){background:#fff!important;color:#222!important;box-shadow:none!important}
+  html[data-historian-theme] :where(.event-open strong,.event-summary,.people-note strong,.floating-content p,.hero h1){color:#222!important}
+  .historian-theme-toggle{display:none!important}
+}
+/* v0.0.86 put campaign footer styles after </body>; keep shared accent authoritative. */
+html[data-historian-theme] .historian-project-footer strong{color:var(--sh-cyan)!important}
+html[data-historian-theme] .historian-project-footer a{color:var(--sh-link)!important}
+/* v0.0.89: FORCE readable printed history. This must beat dark-theme !important
+   rules when Chrome prints with a locally selected dark theme. */
+@media print {
+  html[data-historian-theme="dark"] :where(.people-note) {display:none!important}
+  html[data-historian-theme="dark"] .event-main,
+  html[data-historian-theme="light"] .event-main,
+  html[data-historian-theme="dark"] .hero,
+  html[data-historian-theme="dark"] .chronicle,
+  html[data-historian-theme="dark"] .year,
+  html[data-historian-theme="dark"] .event-open {
+    background:#fff!important;color:#202c32!important;box-shadow:none!important;
+  }
+  html[data-historian-theme="dark"] .event-summary,
+  html[data-historian-theme="dark"] .event-open strong,
+  html[data-historian-theme="dark"] .year-heading span,
+  html[data-historian-theme="dark"] .hero h1,
+  html[data-historian-theme="dark"] .hero p,
+  html[data-historian-theme="dark"] .kicker {
+    color:#263a43!important;text-shadow:none!important;
+  }
+  html[data-historian-theme="dark"] .event .date {color:#72532f!important}
+  html[data-historian-theme="dark"] .tag {
+    background:#fff!important;color:#31424b!important;border:1px solid #a4afb1!important;
+  }
+  html[data-historian-theme="dark"] .historian-footer,
+  html[data-historian-theme="light"] .historian-footer {
+    background:#fff!important;color:#26343a!important;
+  }
+}
+/* v0.0.90 Annals reading controls and authored editorial excerpts.
+   Personal browser annotations remain visually distinct from source history. */
+html[data-historian-theme="dark"] .reading-bar {background:#10212b!important;border-color:#335463!important;color:#cdebf0!important}
+html[data-historian-theme="dark"] .reading-bar :where(input,select,button){background:#152e3a!important;color:#e6f8f8!important;border-color:#45707d!important}
+html[data-historian-theme="dark"] .reading-bar :where(small,#reading-count){color:#a9d7de!important}
+html[data-historian-theme="dark"] :where(.month-heading h3,.chapter-title){color:#98deea!important}
+html[data-historian-theme="dark"] :where(.month-lead,.year-overview){background:#142b35!important;color:#cfe5e8!important;border-color:#3e9297!important}
+html[data-historian-theme="dark"] .chapter-title{border-color:#43727a!important;background:#1c333e!important}
+html[data-historian-theme="dark"] .pin-indicator{color:#a2efc8!important;background:#244138!important}
+html[data-historian-theme="dark"] .date-evidence{color:#9aece4!important}
+html[data-historian-theme="dark"] .personal-notes{border-color:#315462!important}
+html[data-historian-theme="dark"] .personal-notes label{color:#9aece4!important}
+html[data-historian-theme="dark"] .personal-notes small{color:#b9d3db!important}
+html[data-historian-theme="dark"] .personal-notes :where(textarea,button){background:#19303b!important;color:#e1f3f2!important;border-color:#426879!important}
+@media print {
+ html[data-historian-theme="dark"] :where(.month-lead,.year-overview){background:#fff!important;color:#252525!important;border-color:#aaa!important}
+ html[data-historian-theme="dark"] .month-heading h3{color:#333!important}
+ html[data-historian-theme="dark"] .reading-bar{display:none!important}
+}

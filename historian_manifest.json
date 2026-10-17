@@ -1,11 +1,12 @@
 {
   "application": "Stellaris Historian",
-  "version": "0.0.70",
-  "architecture": "military-chronicle-navigation-research-evidence-dossier-export",
+  "version": "0.0.90",
+  "architecture": "v0.0.90-read-only-annals-editorial-reading-and-personal-annotation",
   "managed_roots": [
     "historian",
     "static",
-    "docs"
+    "docs",
+    "roadmap"
   ],
   "protected_roots": [
     ".venv",
@@ -36,12 +37,12 @@
       "cache_version": 1
     },
     "combat": {
-      "status": "direct-telemetry-correlation-episode-synthesis-with-archive-boundary-territorial-analysis",
+      "status": "v0.0.81-direct-child-war-exhaustion-parsing-misnested-battle-values-excluded",
       "cache_component": "combat",
-      "cache_version": 3
+      "cache_version": 4
     },
     "technology": {
-      "status": "modular-evidence-first",
+      "status": "completed-research-history-plus-optional-three-queue-progress-sidecar",
       "cache_component": "technology",
       "cache_version": 1
     },
@@ -49,14 +50,48 @@
       "status": "modular-structured-evidence-first",
       "cache_component": "politics_diplomacy",
       "cache_version": 1
+    },
+    "verified_milestones": {
+      "status": "read-only, derived from exact hash-matched processed annual censuses; no continuity inferred between saves",
+      "persistence": "none; no database migration",
+      "evidence": "archived Ironman snapshot caches and existing leader career records"
     }
   },
   "presentation": {
     "historical_journal": "evidence-led technical ledger",
-    "scribes_view": "deterministic in-universe chronicle using synthesized combat episodes; granular evidence remains in the journal/diagnostics",
-    "empire_timeline": "selective chronology rendered from the shared Historical Event Layer, including major combat episodes and technology milestones",
+    "scribes_view": "v0.0.74 nine-chapter narrative includes evidence-limited politics, non-fictitious authority rubric, contents, reading mode and conservative colony dates",
+    "empire_timeline": "v0.0.85 publication fixes: civilisation-neutral empire language, unresolved ship-name guard, date-bound government census prose, annual member traits and offices, same-year People of Note, processed-save present edge; original timeline styles and cards retained.",
     "scribes_pdf": "direct book-style PDF generated from the same supported chronicle text",
-    "war_journal": "v0.0.70 war index and direct war-ID links, two-ended prev/next navigation, evidence chronology and annual battles, cached first-observed wartime technology, selective theatre filters, printable/shareable text briefs, collapsible forensic tables; v0.0.69 victory and exhaustion provenance preserved"
+    "war_journal": "v0.0.81 direct war-wide exhaustion raw fractions from current saves; no guessed percent formatting, war victories source-only; historically verified named deaths and losses",
+    "time_machine": "v0.0.74 processed archive-date navigation, SQLite political states and reviewed historical presentation caches; registry first-last sighting spans not a census",
+    "interactive_timeline": "retired: bookmarked route redirects to /timeline",
+    "research_history": "v0.0.80 independent campaign-local Research_History.sqlite3 indexed by save hash, three research disciplines and progress; failures do not block Live History",
+    "story_texts": "Local installed Stellaris game text context for projects/situations, not campaign outcome or selection proof.",
+    "rewrite": "v0.0.82 full history rebuild plus campaign-local Civic_Frontier_History.sqlite3 backfill and native research, milestone ledgers",
+    "native_evidence": "Campaign-local Native_Evidence.sqlite3 with all native timeline definitions and global community dates, source-save hash provenance, separate from prose",
+    "civic_frontier": "v0.0.82 read-only Civic & Frontier History page with searchable source-backed political, territorial and station accounts",
+    "annual_government_census": "v0.0.83.1 exact-start and 1 January snapshots; full dated leader roster, roles, ruler, council, governors, assignments and traits; unknown years are marked unavailable; read only; no latest traits projected backwards",
+    "imperial_dashboard": "v0.0.84 local analytical situation room: latest-game-date metrics, event feed, trend charts of raw world population, colonies, stations, controlled/known systems, technologies, fleets and ships from cached historical save states; missing data remains unavailable. Imperial Annals unchanged.",
+    "publication_name_integrity": "Unknown script/localisation ship name tokens are not published as proper names; source names stay intact in evidence and diagnostic files.",
+    "read_only_annals_audit": "scripts/audit_annals_v0_0_85.py - checks database archive coverage and rendered visible prose without editing saves, caches, SQLite or HTML.",
+    "service_milestones": "Annual exact-census anniversaries; 1-year ruler/council and 5+-year all leaders, with source evidence and separate milestone filter",
+    "annals_editorial_v090": {
+      "reading_levels": [
+        "Highlights",
+        "Standard",
+        "Complete"
+      ],
+      "monthly_yearly_narrative": "extracts verbatim source-backed entry bodies without inventing events",
+      "source_date_labels": "strict conservative classification for exact, observed, opening and unknown dates",
+      "personal_annotations": "browser-local only; never written to campaign database or archive",
+      "war_continuity": "display uniquely linked dated war events, no inferred peace or outcome",
+      "selected_year_html": "standalone reader-export from existing timeline events and explicitly distinguished player notes",
+      "read_only": true,
+      "sqlite_migration": false,
+      "cache_version_change": false,
+      "ironman_save_changes": false,
+      "limitations": "historical-domain expansion and validated economy units require additional independent saved evidence"
+    }
   },
   "historical_event_layer": {
     "status": "v0.0.47-shared-presentation-source-with-structured-politics-diplomacy",
@@ -315,5 +350,121 @@
     "ai_evidence_preserved": true,
     "baseline_fixture": "ironman-311.sav: v0.0.65 71.84s -> v0.0.66 8.40s; identical serialized 8 evidence domains",
     "metrics": "<campaign archive>/diagnostics/Processing_Performance.jsonl"
+  },
+  "technology_date_integrity": {
+    "same_day_archives": "date-grouped-max-observed-completed-level",
+    "event_rule": "new higher observed level than any earlier dated group",
+    "day_ambiguity": "no strict after/by window for identical in-game dates",
+    "war_boundaries": "identify acquisitions whose window overlaps pre-war archive",
+    "missing_coverage": "explicit no-within-war-cache notice",
+    "migration_required": false,
+    "database_schema_change": false,
+    "parsed_cache_version_change": false,
+    "ironman_save_mutation": false,
+    "live_history_processing_change": false
+  },
+  "empire_archive": {
+    "source": "existing SQLite historical and registry tables, processed history entries only",
+    "route": "/empire-archive",
+    "file": "<campaign archive>/Empire_Archive.html",
+    "categories": [
+      "leaders",
+      "worlds",
+      "fleets",
+      "ships",
+      "diplomacy",
+      "dated non-war history"
+    ],
+    "filters": [
+      "text",
+      "year range",
+      "technical observations"
+    ],
+    "exports": [
+      "CSV event ledger",
+      "JSON records"
+    ],
+    "raw_save_reparse": false,
+    "cache_version_change": false,
+    "database_schema_change": false,
+    "live_history_pipeline_change": false,
+    "screenshot_annotations": false
+  },
+  "interactive_timeline": {
+    "route": "/interactive-timeline",
+    "status": "read-only-snapshot-cache-and-sqlite",
+    "date_playback": "recorded-dates-only",
+    "categories": [
+      "colonies",
+      "space_combat",
+      "ground_combat",
+      "technology",
+      "first_contacts",
+      "government",
+      "imperial_council",
+      "federations",
+      "galactic_community",
+      "diplomacy",
+      "leaders",
+      "navy",
+      "science"
+    ],
+    "save_reads": false,
+    "schema_change": false,
+    "live_history_change": false,
+    "manual_annotations": false
+  },
+  "features": {
+    "civic_frontier": "v0.0.82 SHA-matched campaign-local governance, council, sectors, system discovery, territorial control, mining/research station commissioning and starbase level/module transitions",
+    "empire_timeline": "v0.0.82 native political and frontier states with dated observations, planet governor/designation observations, corrected print pagination and shared evidence cache reads",
+    "rewrite": "v0.0.82 full archive rebuild plus non-destructive Civic_Frontier_History.sqlite3 backfill and research history ledger"
+  },
+  "government_people": {
+    "source": "historian.db leader_registry, leader_deep_evidence, leader_career_events, politics_states, politics_history_events, world_history_events",
+    "mode": "read-only evidence presentation"
+  },
+  "database_explorer": {
+    "mode": "localhost-read-only",
+    "sql": "SELECT only",
+    "write_actions_enabled": false
+  },
+  "launcher_banner": {
+    "format": "ASCII-only 7-row fixed-width monospaced glyphs",
+    "file": "assets/stellaris_banner.txt",
+    "reason": "Reliable letter alignment and no missing-glyph diamonds in Windows Terminal",
+    "data_change": false
+  },
+  "civic_crisis_tracking": {
+    "version": 4,
+    "source": "Native player-country situations.situations + player-owned colony/carrier and planet records",
+    "persistence": "Campaign-local Civic_Frontier_History.sqlite3, hash-bound observation payload; no main DB schema migration",
+    "scope": "Active player-country situations with verifiably owned colony or planet targets; scoped country-wide situations only",
+    "timeline": "Observed start, observed stage transition, observed absence; all observation dates",
+    "uncertainty": "Situation disappearance does not establish outcome, causation, event/decision text or exact occurrence date",
+    "research_export": "Public_Order_Crisis_Observations.csv generated from already-indexed observations",
+    "screenshot_evidence": false,
+    "ironman_save_writes": false,
+    "reindex": "Use existing Update Historical Timeline to populate v4; old v1-v3 observations remain readable"
+  },
+  "intelligence_tracking": {
+    "source": "Native spy_networks top-level records, only owner equal to player country",
+    "version": 4,
+    "route": "/intelligence-history",
+    "persistence": "Campaign-local Civic_Frontier_History.sqlite3, SHA-256 keyed",
+    "foreign_espionage": "excluded",
+    "automatic_empty_networks": "retained as passive records, not claimed operations",
+    "interpretation": "No inferred actual operations, results, agency, opponent names, or exact establishment dates",
+    "historical_backfill": "Update Historical Timeline",
+    "screenshot_evidence": false,
+    "ironman_save_writes": false
+  },
+  "annals_publication": {
+    "language": "en-GB",
+    "government_census": "opening and four-year interval, additionally next exact January save after proven leadership crisis",
+    "yearly_census_register": "all exact January caches still retained",
+    "service_milestones": "same date and span grouped in timeline, individual evidence retained",
+    "pdf": "print on white regardless of dark/light UI; duplicate People of Note suppressed",
+    "schema_change": false,
+    "screenshot_evidence": false
   }
 }

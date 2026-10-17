@@ -1,0 +1,39 @@
+STELLARIS HISTORIAN v0.0.81 — THE GREAT CHRONICLE REBUILD
+
+CLASSIC FLAT-ROOT APPLICATION PATCH (NO WRAPPER FOLDER)
+
+Extract these files directly into G:\codex\StellarisHistorian, replacing application files.
+Preserve your data/, .venv/, autobackups/, local configuration and Ironman saves.
+Turn Live History OFF, wait for activity to finish, CLOSE the application before installing.
+Restart from the existing root start.bat. No database schema migration.
+
+IMPORTANT: Manage Campaign > Update Historical Timeline now does a genuine full historical
+rebuild. It makes a consistent SQLite backup, reprocesses all 519+ archived save files
+with current versioned evidence components, and refreshes the canonical Imperial Annals.
+This FIRST run may be lengthy; let the operation finish before enabling Live History.
+Native player-country milestones, war-wide exhaustion and galactic institution dates
+are recovered when supported by save evidence. Scripted popup choices are NOT guessed.
+
+Application files in patch (22):
+  README.md
+  app.py
+  docs/CHANGELOG.md
+  documentation/release_notes/README_v0.0.81.md
+  historian/__init__.py
+  historian/founding_chapter.py
+  historian/native_milestones.py
+  historian/narrative_clean.py
+  historian/timeline.py
+  historian/timeline_rewrite.py
+  historian/history_processor.py
+  historian/domains/combat/parser.py
+  historian/domains/combat/__init__.py
+  historian/war_journal.py
+  historian_manifest.json
+  start.bat
+  static/campaign.html
+  static/campaign.js
+  test_v0_0_75.py
+  test_v0_0_76.py
+  test_v0_0_78.py
+  test_v0_0_81.py

@@ -336,3 +336,58 @@ main{
     width:100%;
   }
 }
+
+/* v0.0.73: keep the new Timeline action accessible at desktop widths. */
+@media (min-width:981px) and (max-width:1850px){
+  header{flex-wrap:wrap}
+  .brand{max-width:100%}
+}
+
+/* v0.0.74: The Historical Observatory, a secondary library under the campaign. */
+.historian-library{border-color:#50657a;background:radial-gradient(ellipse at 85% -25%,rgba(106,135,159,.13),transparent 60%),#111d2b}
+.library-kicker{font-size:10px;letter-spacing:.2em;color:#d2ae73;font-weight:750;margin-bottom:6px}
+.library-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:19px}
+.library-tile{min-height:150px;text-decoration:none;color:#f3e8d5;border:1px solid #486077;background:linear-gradient(145deg,#1a2b3e,#111c2b);border-radius:9px;padding:18px;display:flex;flex-direction:column;gap:8px;transition:border-color .2s,transform .2s,background .2s}
+.library-tile:hover,.library-tile:focus-visible{border-color:#d7b67c;transform:translateY(-2px);background:#213a4f;outline:none}
+.library-glyph{font:normal 30px Georgia,serif;color:#d9b67f;line-height:1}
+.library-tile strong{font:normal 21px Georgia,serif}
+.library-tile small{font-size:12px;line-height:1.4;color:#b1c6d7}
+@media(prefers-reduced-motion:reduce){.library-tile{transition:none}.library-tile:hover{transform:none}}
+
+/* v0.0.75: compact campaign controls and a proper observatory library. */
+.campaign-topbar{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;min-height:92px;padding:14px max(18px,calc((100vw - 1370px)/2))}
+.campaign-topbar .brand{flex:1;min-width:230px}
+.campaign-topbar .brand h1{font:normal clamp(21px,2vw,31px)/1.2 Georgia,serif;color:#f1e7d1}
+.campaign-top-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+.explore-link{color:#ffe0ad;text-decoration:none;border:1px solid #8d704d;background:#3b2e23;border-radius:7px;padding:10px 16px;font-weight:700}
+.explore-link:hover{background:#62452d}
+.campaign-menu{position:relative;z-index:50}.campaign-menu summary{list-style:none;cursor:pointer;border:1px solid #4d6276;background:#1c3042;color:#e9f3fa;padding:10px 14px;border-radius:7px;font-weight:700}
+.campaign-menu summary::-webkit-details-marker{display:none}.campaign-menu-items{position:absolute;right:0;top:calc(100% + 6px);min-width:245px;background:#152637;box-shadow:0 16px 42px #000b;border:1px solid #5a7186;border-radius:9px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.campaign-menu-items button{text-align:left;width:100%}.campaign-menu-items button.danger-button{margin-top:6px}
+main:has(.historian-library){max-width:1280px;padding-top:19px}.campaign-summary{margin-top:13px}.historian-library{margin-top:20px}
+@media(max-width:700px){.campaign-topbar{align-items:flex-start}.campaign-top-actions{width:100%}.campaign-menu-items{right:auto;left:0}.explore-link{flex:1;text-align:center}}
+/* Balanced bookshelf rather than five tiles followed by a lone card. */
+.historian-library .library-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.historian-library .library-tile{min-height:135px}
+@media(max-width:900px){.historian-library .library-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.historian-library .library-grid{grid-template-columns:1fr}}
+
+/* v0.0.76: independently testable, cache-busted campaign navigation and cards. */
+.campaign-topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:24px}
+.campaign-top-actions{display:flex;align-items:center;flex-wrap:nowrap;gap:10px}
+.campaign-top-actions .explore-link,.campaign-top-actions .campaign-menu>summary{display:inline-flex;align-items:center;justify-content:center;min-height:42px;white-space:nowrap;text-decoration:none}
+.campaign-top-actions .campaign-menu>summary{user-select:none}
+.historian-library .library-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.historian-library a.library-tile{display:flex!important;flex-direction:column;min-height:140px;padding:17px;text-decoration:none!important;color:#f3e8d5!important;background:linear-gradient(145deg,#1a2b3e,#111c2b);border:1px solid #50657a;border-radius:9px;gap:8px}
+.historian-library a.library-tile:focus-visible{outline:2px solid #e8c391;outline-offset:2px}
+.historian-library .library-tile strong{font:normal 20px/1.25 Georgia,serif;color:#f6e8cf}
+.historian-library .library-tile small{display:block;font:12px/1.45 Segoe UI,Arial,sans-serif;color:#aec8dc}
+@media(max-width:1080px){.campaign-topbar{grid-template-columns:1fr}.campaign-top-actions{flex-wrap:wrap}}
+@media(max-width:920px){.historian-library .library-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:570px){.historian-library .library-grid{grid-template-columns:1fr}.campaign-top-actions{align-items:stretch}.campaign-top-actions .campaign-menu{width:100%}.campaign-top-actions .campaign-menu>summary{width:100%}}
+
+/* v0.0.78: self-contained game text setup in the advanced campaign menu. */
+.campaign-menu-items .game-folder-label{display:flex;flex-direction:column;gap:6px;padding:8px 4px;color:#bfced9;font-size:12px;max-width:365px}
+.campaign-menu-items .game-folder-label input{width:100%;min-width:0;padding:10px;background:#0d1b2a;color:#f2f7fa;border:1px solid #4c657e;border-radius:5px;font:13px Segoe UI,Arial,sans-serif}
+.campaign-menu-items .game-folder-label button{align-self:flex-start}
+@media(max-width:650px){.campaign-menu-items .game-folder-label{max-width:100%}}

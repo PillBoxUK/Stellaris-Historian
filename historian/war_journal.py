@@ -5,7 +5,6 @@ from html import escape
 from pathlib import Path
 import os
 import tempfile
-import json
 import re
 
 from .db import Database
@@ -99,8 +98,8 @@ def _aggregate_formal_wars(history: PresentationHistory) -> list[FormalWarRecord
                     player_side=state.player_side,
                     attacker_war_goal=state.attacker_war_goal,
                     defender_war_goal=state.defender_war_goal,
-                    attacker_war_exhaustion=None,
-                    defender_war_exhaustion=None,
+                    attacker_war_exhaustion=getattr(state,"attacker_war_exhaustion",None),
+                    defender_war_exhaustion=getattr(state,"defender_war_exhaustion",None),
                     attacker_country_ids=tuple(state.attacker_country_ids),
                     defender_country_ids=tuple(state.defender_country_ids),
                 )
@@ -114,8 +113,12 @@ def _aggregate_formal_wars(history: PresentationHistory) -> list[FormalWarRecord
                 record.defender_war_goal = state.defender_war_goal or record.defender_war_goal
                 record.attacker_country_ids = tuple(state.attacker_country_ids) or record.attacker_country_ids
                 record.defender_country_ids = tuple(state.defender_country_ids) or record.defender_country_ids
-                # Cached combat snapshots from earlier versions may contain
-                # misattributed nested battle values; never expose as totals.
+                # Cache v4+ supplies verified direct war-child fields. Older
+                # caches will be invalidated by their component version.
+                if getattr(state,'attacker_war_exhaustion',None) is not None:
+                    record.attacker_war_exhaustion=state.attacker_war_exhaustion
+                if getattr(state,'defender_war_exhaustion',None) is not None:
+                    record.defender_war_exhaustion=state.defender_war_exhaustion
 
             for battle in state.battles:
                 record.battles[battle.battle_key] = battle
@@ -138,89 +141,40 @@ def _aggregate_formal_wars(history: PresentationHistory) -> list[FormalWarRecord
 
 
 def _war_display_title(record: FormalWarRecord, empire_name: str, country_names: dict[int, str] | None = None) -> tuple[str, str]:
-    """Use native names when present, then explicitly annotated screenshot evidence.
+    """Build titles from native war fields and cached country identities only.
 
-    Never pretend a constructed or screenshot-derived label was recovered from a
-    Stellaris save. The annotations are scoped to a campaign empire, war ID and
-    start date, so a reused numerical war ID cannot bleed into a new campaign.
+    Neither manually supplied names nor screenshots may influence the journal.
+    Unresolved opposing parties remain explicitly unnamed.
     """
     native = str(record.name or "").strip()
     if native and not re.fullmatch(r"War\s+\d+", native, flags=re.IGNORECASE):
         return native, "Name retained from parsed Stellaris war record"
-    annotation_file = Path(__file__).with_name("war_name_annotations.json")
-    try:
-        annotations = json.loads(annotation_file.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        annotations = []
-    if isinstance(annotations, list):
-        for annotation in annotations:
-            if not isinstance(annotation, dict):
-                continue
-            if (annotation.get("empire") == empire_name
-                    and annotation.get("war_id") == record.war_id
-                    and annotation.get("start_date") == record.start_date
-                    and isinstance(annotation.get("display_name"), str)
-                    and annotation["display_name"].strip()):
-                return annotation["display_name"].strip(), "Title confirmed by in-game screenshot; not recovered from save"
     if record.attacker_war_goal:
-        # Campaign/war/start/country-scoped confirmations supplement automatic
-        # cached identity resolution when Stellaris stores unresolved %ADJ% keys.
-        country_names = dict(country_names or {})
-        try:
-            party_annotations = json.loads(Path(__file__).with_name("war_party_names.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            party_annotations = []
-        opponents = (record.defender_country_ids if record.player_side == "attacker"
-                     else record.attacker_country_ids)
-        annotated_name = False
-        for item in party_annotations if isinstance(party_annotations, list) else []:
-            if (isinstance(item, dict) and item.get("empire") == empire_name
-                and item.get("war_id") == record.war_id
-                and item.get("start_date") == record.start_date
-                and item.get("opponent_country_id") in opponents
-                and isinstance(item.get("name"), str) and item["name"].strip()):
-                country_names[item["opponent_country_id"]] = item["name"].strip()
-                annotated_name = True
         goal = str(record.attacker_war_goal).replace("_", " ").strip().title()
-        # Opposing party comes from the retained war coalition; its displayed
-        # name comes from independently identified cached enemy evidence.
         opponent_ids = (record.defender_country_ids if record.player_side == "attacker"
                         else record.attacker_country_ids)
         named = [(cid, (country_names or {}).get(cid, "")) for cid in opponent_ids]
-        named = [(cid, label) for cid, label in named if label and not re.fullmatch(r"Country\s+\d+", label, re.I)]
+        named = [(cid, label) for cid, label in named
+                 if label and not re.fullmatch(r"Country\s+\d+", label, flags=re.I)]
         if len(opponent_ids) == 1 and len(named) == 1:
-            provenance = ("Name from campaign-and-war-scoped evidence annotation, not the native war title"
-                          if annotated_name else
-                          "Name resolved from cached diplomatic/combat evidence, not the native war title")
             return (f"War of {goal} against {named[0][1]}",
-                    "Historian-generated title: retained war goal and opposing country ID; " + provenance)
+                    "Historian-generated title: retained war goal and country identity "
+                    "resolved from archived diplomatic/combat evidence")
         if named:
             return (f"War of {goal} against " + _join([name for _id, name in named]),
-                    "Historian-generated title: known opposing war participants only; coalition names not inferred")
-        return f"War of {goal}", "Descriptive title constructed from recorded war goal; opposing party name not independently resolved"
+                    "Historian-generated title: known opposing war participants from cached save evidence; "
+                    "unresolved participants not guessed")
+        return f"War of {goal}", ("Descriptive title from recorded war goal; "
+                                  "opposing party name not established from saved evidence")
     return f"War {record.war_id}", "Native war name unavailable"
 
 
-def _war_victory_annotation(record: FormalWarRecord, empire_name: str) -> dict | None:
-    """Manual screenshot evidence, strictly scoped to campaign, war ID and start date.
+def _war_victory_annotation(record: FormalWarRecord, empire_name: str) -> None:
+    """Compatibility shim: external claims are never imported as canonical war facts.
 
-    Screenshots are NOT native save facts and the observed notification timestamp
-    does not independently establish the exact peace/treaty execution day.
+    Historical results require direct decoded save evidence. Existing manual
+    annotation JSON files are not read, modified or deleted by this policy.
     """
-    try:
-        items = json.loads(Path(__file__).with_name("war_outcome_annotations.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    for item in items if isinstance(items, list) else []:
-        if (isinstance(item, dict) and item.get("empire") == empire_name
-            and item.get("war_id") == record.war_id
-            and item.get("start_date") == record.start_date
-            and item.get("notification_date")
-            and item.get("source") and item.get("result")
-            and record.first_absent_after_last):
-            date = str(item["notification_date"])
-            if _date_key(record.last_observed) <= _date_key(date) <= _date_key(record.first_absent_after_last):
-                return item
     return None
 
 
@@ -254,46 +208,107 @@ def _war_nav_html(wars: list[FormalWarRecord], position: int, empire_name: str,
 
 
 def _war_technology_html(record: FormalWarRecord, tech_events: tuple[object, ...],
-                         *, snapshots_available: bool = False) -> str:
-    """Cached technology acquisitions observed while a war appears in the archive.
+                         *, snapshots_available: bool = False,
+                         technology_dates: tuple[str, ...] = ()) -> str:
+    """War research evidence from completed technology only; no raw-save reads.
 
-    Not evidence the conflict caused a technology to be researched. First-observed
-    events are quarterly windows, not exact completion dates. Active research
-    queues are deliberately excluded by the source technology domain.
+    An event's first-observed archive is not proof that its acquisition happened
+    after the war began, even when its first-observed date falls inside a war.
+    The previous-day bound and archive coverage are displayed separately.
     """
+    from .domains.technology.history import technology_window_label
     if not snapshots_available:
         return ('<details class="wartime-tech"><summary>Technology during this conflict — archive coverage unavailable</summary>'
                 '<p class="evidence-note">There are no comparable cached technology snapshots. '
                 'This is not evidence that research stopped.</p></details>')
+
     lower = _date_key(record.first_observed)
     upper = _date_key(record.last_observed)
+    dates = sorted({_date_key(date): date for date in technology_dates
+                    if _date_key(date)[0] < 999999}.items())
+    inside = [(key, date) for key, date in dates if lower <= key <= upper]
+    before = [date for key, date in dates if key < lower]
+    # If the caller hasn't supplied coverage dates (older tests/integrations),
+    # don't pretend that there are zero within-war archives.
+    if technology_dates and not inside:
+        return ('<details class="wartime-tech"><summary>Technology during this conflict — no within-war archive coverage</summary>'
+                '<p class="evidence-note research-coverage">No completed-technology cache has a date between '
+                f'{_e(record.first_observed)} and {_e(record.last_observed)}. '
+                'Research cannot be assessed for this war from these caches; '
+                'this does not mean research stopped.</p></details>')
+
     observed = [t for t in tech_events if lower <= _date_key(t.game_date) <= upper]
     observed.sort(key=lambda t: (_date_key(t.game_date), str(t.name)))
     rows = []
+    overlaps = 0
     for item in observed:
-        window = (f'after {item.previous_game_date} and by {item.game_date}'
-                  if item.previous_game_date else f'by {item.game_date}')
+        # An appearance inside the war can be bounded by an earlier archive
+        # outside the war. It must not be called research completed during war.
+        previous = _date_key(item.previous_game_date)
+        straddles = bool(item.previous_game_date and previous < lower)
+        if straddles:
+            overlaps += 1
+        linkage = ('Window begins before the first archived war observation; may predate war'
+                   if straddles else 'First seen while war archived; connection to war unverified')
         level = f'Level {item.level}' if item.level > 1 else 'First observed'
         rows.append(f'<tr><td>{_e(item.game_date)}</td><td>{_e(item.name)}</td>'
-                    f'<td>{_e(level)}</td><td>{_e(window)}</td></tr>')
+                    f'<td>{_e(level)}</td><td>{_e(technology_window_label(item))}</td>'
+                    f'<td>{_e(linkage)}</td></tr>')
     detail = ('<div class="table-wrap"><table><thead><tr><th>First observed</th><th>Technology</th>'
-              '<th>Recorded status</th><th>Acquisition window</th></tr></thead><tbody>'
-              + ''.join(rows) + '</tbody></table></div>') if rows else (
-              '<p class="evidence-note">No new technology was observed in the comparable cached snapshots '
-              'within this war’s observed window. This does not establish that research stopped.</p>')
-    return (f'<details class="wartime-tech"><summary>Research advances observed during this war '
-            f'({len(observed)})</summary>{detail}'
-            '<p class="evidence-note">Drawn from already-cached completed-technology records, not queued '
-            'research. The observation date is the first archived date showing an acquisition or level increase; '
-            'its exact completion date and any connection to this war are unverified. '
-            'Research from before the first cached technology snapshot may not appear.</p></details>')
+              '<th>Recorded status</th><th>Acquisition window</th><th>War relationship</th>'
+              '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table></div>') if rows else (
+              '<p class="evidence-note">No additional completed technology was observed in these comparable '
+              'cached snapshots during the war observation window. This does not establish that research stopped.</p>')
+    if technology_dates:
+        coverage = (f'{len(inside)} distinct technology archive date(s) within the war observation window '
+                    f'({_e(inside[0][1])} to {_e(inside[-1][1])}). ' if inside else '')
+        coverage += ('A technology archive also precedes the first war observation. ' if before else
+                     'No earlier cached technology date is available to establish the opening boundary. ')
+    else:
+        coverage = 'Detailed technology snapshot-date coverage was not provided to this renderer. '
+    if overlaps:
+        coverage += f'{overlaps} observation window(s) cross the first war archive boundary; those advances could predate the war. '
+    return (f'<details class="wartime-tech"><summary>Research advances first observed while war archived '
+            f'({len(observed)})</summary>'
+            f'<p class="evidence-note research-coverage">{coverage}</p>{detail}'
+            '<p class="evidence-note">Source: already-cached completed technologies, never queued research. '
+            'First observed is not an exact acquisition day, nor proof the conflict caused the research. '
+            'Opening archive knowledge is not counted as a new discovery; gaps in coverage may hide advances.</p></details>')
 
 
-def _war_chronology_html(record: FormalWarRecord, victory: dict | None) -> str:
-    """Summary grounded only in retained formal battles and scoped screenshot notices.
+def _research_audit_html(technology_history: dict) -> str:
+    """Read-only archive-coverage card for a source-transparent military journal."""
+    coverage = technology_history.get('coverage', {})
+    dates = int(coverage.get('distinct_dates', 0))
+    if not dates:
+        return ('<section id="research-audit"><h2>Technology Archive Audit</h2>'
+                '<p class="evidence-note">No valid dated completed-technology snapshots were found in the '
+                'processed evidence cache. This does not mean the empire stopped researching.</p></section>')
+    events = technology_history.get('events', ())
+    return (f'<section id="research-audit"><h2>Technology Archive Audit</h2>'
+            '<p class="evidence-note">Independent research-cache quality check. These observations are '
+            'not battle outcomes and cannot establish that a war caused a technological advance.</p>'
+            '<div class="facts">'
+            f'<div><span>Completed-technology archive snapshots</span><strong>{int(coverage.get("snapshots", 0))}</strong></div>'
+            f'<div><span>Distinct dated observations</span><strong>{dates}</strong></div>'
+            f'<div><span>Additional saves on existing dates</span><strong>{int(coverage.get("same_date_additional_snapshots", 0))}</strong></div>'
+            f'<div><span>Same-day states differing</span><strong>{int(coverage.get("same_date_disagreement_days", 0))}</strong></div>'
+            f'<div><span>Invalid dated caches excluded</span><strong>{int(coverage.get("invalid_date_snapshots", 0))}</strong></div>'
+            f'<div><span>New observed advances/levels</span><strong>{len(events)}</strong></div>'
+            '</div>'
+            f'<p class="evidence-note">Research coverage runs from {_e(coverage.get("first_date"))} '
+            f'to {_e(coverage.get("last_date"))} (archive observation dates, not exact completion days). '
+            'Multiple saved states dated the same day are not ordered as though the game retained a time of day. '
+            'Missing or lower later cache values cannot manufacture a new completion. '
+            'Detailed acquisition windows appear within each formal war report only where the war and '
+            'research archive windows overlap.</p></section>')
 
-    Timeline clusters are recorded battle dates; they do not claim military
-    victory, destroyed ships, permanent annexation, or the treaty execution day.
+
+def _war_chronology_html(record: FormalWarRecord, victory: dict | None = None, *, empire_name: str = "the civilisation") -> str:
+    """Timeline grounded only in decoded war records and cached battles.
+
+    The optional second argument is ignored for backward API compatibility.
+    No external testimony, screenshots or annotated outcomes enter the report.
     """
     battles = sorted(record.battles.values(), key=lambda b: (_date_key(b.date), str(b.battle_key)))
     dated = [b for b in battles if _date_key(b.date)[0] < 999999 and _date_key(b.date) != (0, 1, 1)]
@@ -320,30 +335,28 @@ def _war_chronology_html(record: FormalWarRecord, victory: dict | None) -> str:
     last = (f'<li><strong>{_e(dated[-1].date)}</strong> — Last dated player-involved battle retained '
             f'({_e(dated[-1].system_name or dated[-1].planet_name or "location not established")})</li>') if len(dated)>1 else ''
     seen = f'<li><strong>{_e(record.last_observed)}</strong> — Last archive observation retaining the war</li>'
-    notice = (f'<li><strong>{_e(victory["notification_date"])}</strong> — '
-              'Player screenshot confirms a Commonwealth victory notification; exact treaty day not inferred</li>') if victory else ''
     absence = (f'<li><strong>{_e(record.first_absent_after_last)}</strong> — '
                'First later archive without this war</li>') if record.first_absent_after_last else ''
     notable = sorted((b for b in dated if b.player_losses is not None),
                      key=lambda b: (-b.player_losses, _date_key(b.date), str(b.battle_key)))[:3]
     highlights = ''.join(
         f'<li><strong>{_e(b.date)}</strong> — {_e(b.system_name or b.planet_name or "Unresolved location")}: '
-        f'{_e(b.player_losses)} recorded Commonwealth ship losses (formal battle tally; no cause inferred)</li>'
+        f'{_e(b.player_losses)} recorded {_e(empire_name)} ship losses (formal battle tally; no cause inferred)</li>'
         for b in notable if b.player_losses > 0
     )
     year_table = ('<div class="table-wrap"><table><thead><tr><th>Year</th><th>Battles</th><th>Observed dates</th>'
-                  '<th>Recorded battle locations</th><th>Commonwealth losses</th><th>Opposing losses</th>'
+                  f'<th>Recorded battle locations</th><th>{_e(empire_name)} losses</th><th>Opposing losses</th>'
                   '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table></div>') if rows else '<p class="muted">No dated player-involved formal battles recovered.</p>'
     return (f'<section class="war-chronicle" aria-label="War chronology">'
             '<h4>War chronicle — verified observation sequence</h4>'
-            f'<ol class="chronicle-milestones">{start}{first}{last}{seen}{notice}{absence}</ol>'
+            f'<ol class="chronicle-milestones">{start}{first}{last}{seen}{absence}</ol>'
             '<p class="evidence-note">The milestones combine native war and battle dates, quarterly save observations, '
-            'and separately labelled screenshot evidence. They are not a proof of battle outcomes or a full day-by-day war diary.</p>'
+            'only. They are not proof of war outcomes or a full day-by-day war diary.</p>'
             '<details class="chronicle-years"><summary>Year-by-year battle chronology '
             f'({len(dated)} dated player-involved battles across {len(years)} years)</summary>{year_table}'
             '<p class="evidence-note">Casualties are recorded per formal battle. Incomplete means at least one '
             'battle has no complete count; no missing values are guessed.</p></details>'
-            + (f'<details class="chronicle-highlights"><summary>Largest recorded Commonwealth ship-loss events</summary>'
+            + (f'<details class="chronicle-highlights"><summary>Largest recorded {_e(empire_name)} ship-loss events</summary>'
                f'<ol>{highlights}</ol><p class="evidence-note">Not a ranking of war importance or proof of starbase '
                'damage. Station involvement requires separate evidence.</p></details>' if highlights else '')
             + '</section>')
@@ -356,9 +369,7 @@ def _war_index_html(wars: list[FormalWarRecord], empire_name: str,
     cards = []
     for number, war in enumerate(wars, 1):
         title, _ = _war_display_title(war, empire_name, country_names)
-        victory = _war_victory_annotation(war, empire_name)
-        state = (f'Victory notice {victory["notification_date"]} · screenshot evidence' if victory
-                 else f'Ending bounded by {war.first_absent_after_last}' if war.first_absent_after_last
+        state = (f'Ending bounded by {war.first_absent_after_last}' if war.first_absent_after_last
                  else 'No ending boundary established')
         cards.append(f'<a class="war-index-card" href="#{_war_anchor(war.war_id)}" '
                      f'title="Read {_e(title)}">'
@@ -457,7 +468,8 @@ def _episode_html(episode, empire_name: str) -> str:
 
 def _formal_war_html(record: FormalWarRecord, latest_combat_date: str | None, empire_name: str = "", country_names: dict[int, str] | None = None,
                      *, navigator_top: str = "", navigator_bottom: str = "",
-                     technology_events: tuple[object, ...] = (), technology_available: bool = False) -> str:
+                     technology_events: tuple[object, ...] = (), technology_available: bool = False,
+                     technology_dates: tuple[str, ...] = ()) -> str:
     title, title_provenance = _war_display_title(record, empire_name, country_names)
     battles = sorted(record.battles.values(), key=lambda row: _date_key(row.date))
     rows: list[str] = []
@@ -533,21 +545,6 @@ def _formal_war_html(record: FormalWarRecord, latest_combat_date: str | None, em
             "Current status unverified"
         )
 
-    victory = _war_victory_annotation(record, empire_name)
-    if victory:
-        status = (f"Screenshot-confirmed {victory['result']} notification: {victory['notification_date']}. "
-                  f"War absent by {record.first_absent_after_last}; last seen in save {record.last_observed}. "
-                  "Exact treaty execution day is not independently recovered from saves.")
-        screenshot_evidence = (
-            "<section class='aftermath war-confirmation'><h4>Victory notification — screenshot evidence</h4>"
-            f"<p><strong>{_e(victory['result'])}</strong> · notification observed {_e(victory['notification_date'])}</p>"
-            f"<p>{_e(victory.get('details', ''))}</p>"
-            f"<p class='evidence-note'>Source: {_e(victory['source'])}. This is a dated player-supplied screenshot; "
-            "the save independently establishes only the ending interval and archived territorial control changes.</p></section>"
-        )
-    else:
-        screenshot_evidence = ""
-
     battle_table = (
         "<p class='muted'>No direct player battle rows are retained for this war.</p>"
         if not rows
@@ -576,12 +573,12 @@ def _formal_war_html(record: FormalWarRecord, latest_combat_date: str | None, em
           <div><span>Status</span><strong>{_e(status)}</strong></div>
           <div><span>Attacker war goal</span><strong>{_e(record.attacker_war_goal or 'Not retained')}</strong></div>
           <div><span>Defender war goal</span><strong>{_e(record.defender_war_goal or 'Not retained')}</strong></div>
-          <div><span>War-wide attacker exhaustion</span><strong>{_e(_float_percent(record.attacker_war_exhaustion) if record.attacker_war_exhaustion is not None else 'Not verified from archived war')}</strong></div>
-          <div><span>War-wide defender exhaustion</span><strong>{_e(_float_percent(record.defender_war_exhaustion) if record.defender_war_exhaustion is not None else 'Not verified from archived war')}</strong></div>
+          <div><span>Attacker exhaustion (raw fraction)</span><strong>{_e(_float_percent(record.attacker_war_exhaustion) if record.attacker_war_exhaustion is not None else 'Not verified from archived war')}</strong></div>
+          <div><span>Defender exhaustion (raw fraction)</span><strong>{_e(_float_percent(record.defender_war_exhaustion) if record.defender_war_exhaustion is not None else 'Not verified from archived war')}</strong></div>
         </div>
-        {screenshot_evidence}
-        {_war_chronology_html(record, victory)}
-        {_war_technology_html(record, technology_events, snapshots_available=technology_available)}
+        {_war_chronology_html(record, empire_name=empire_name)}
+        {_war_technology_html(record, technology_events, snapshots_available=technology_available,
+                              technology_dates=technology_dates)}
         <div class="war-actions"><button type="button" class="copy-war-brief" aria-label="Copy this war's evidence brief">Copy war brief</button><button type="button" class="download-war-brief" aria-label="Download this war's evidence brief">Save war brief (.txt)</button><span class="war-copy-feedback" role="status" aria-live="polite"></span></div>
         <div class="evidence-audit">
           <h4>Retained war and battle evidence</h4>
@@ -613,7 +610,7 @@ def _formal_war_html(record: FormalWarRecord, latest_combat_date: str | None, em
           <button class="aftermath-run military-run" type="button" data-war-id="{_e(record.war_id)}">Investigate ground and starbase evidence</button>
           <div class="military-result" role="status" aria-live="polite"></div>
         </section>
-        <p class="evidence-note"><strong>Exhaustion evidence:</strong> Stellaris stores attacker_war_exhaustion and defender_war_exhaustion inside individual battle entries, not as verified current war-wide totals. The on-demand investigation lists those raw battle-local fields separately; summing them or calling them current exhaustion would be misleading. For war-wide percentages, a dated in-game war screen is needed.</p>
+        <p class="evidence-note"><strong>Exhaustion evidence:</strong> The values above come from the war record’s direct attacker_war_exhaustion and defender_war_exhaustion children in its last observed save, where available. Raw fractions are shown without assuming their exact on-screen percentage display or converting nested battle-local fields into war-wide totals.</p>
         <p class="evidence-note"><strong>Outcome verification pending:</strong> the tactical battle attacker/defender roles and raw attacker_victory field are shown separately. Their mapping to player victory/defeat is under review against war coalition and occupation evidence; no result is reversed automatically.</p>
         {theatre_html}
         <details class="battle-dossier"><summary>Direct player battle records ({len(battles)}) — expand detailed tables and filters</summary>
@@ -747,12 +744,16 @@ def render_war_journal(db: Database, campaign_id: int) -> Path:
     # Cached technology snapshots were already loaded by the shared presentation
     # layer. Research summaries do not touch saves, SQL or Live History.
     from .domains.technology.history import derive_technology_history
-    technology_events = tuple(derive_technology_history(list(history.technology_snapshots))["events"])
+    technology_history = derive_technology_history(list(history.technology_snapshots))
+    technology_events = tuple(technology_history["events"])
+    research_audit_html = _research_audit_html(technology_history)
+    technology_dates = tuple(snapshot.game_date for snapshot in history.technology_snapshots)
     war_html = "".join(
         _formal_war_html(record, latest_combat_date, empire_label, country_names,
             navigator_top=_war_nav_html(formal_wars, i, empire_label, country_names),
             navigator_bottom=_war_nav_html(formal_wars, i, empire_label, country_names, at_bottom=True),
-            technology_events=technology_events, technology_available=bool(history.technology_snapshots))
+            technology_events=technology_events, technology_available=bool(history.technology_snapshots),
+            technology_dates=technology_dates)
         for i, record in enumerate(formal_wars)
     )
     if not war_html:
@@ -794,7 +795,7 @@ main{{width:min(94vw,2200px);margin:auto;background:var(--paper);min-height:100v
 .war-card,.episode-card{{background:#19293a;border:1px solid #3a536b;border-left:5px solid var(--red);padding:19px 21px;margin:14px 0}} .episode-card{{border-left-color:var(--blue)}} .date{{font:700 11px Arial,sans-serif;color:#e7bc85;text-transform:uppercase;letter-spacing:.06em}} h3{{font-size:24px;font-weight:500;margin:5px 0 13px}} h4{{font-size:18px;margin:20px 0 8px}} .episode-head{{display:flex;gap:16px;justify-content:space-between;align-items:flex-start}} .badge{{font:700 10px Arial,sans-serif;text-transform:uppercase;letter-spacing:.06em;border:1px solid #aaa;border-radius:999px;padding:6px 9px;white-space:nowrap}} .badge.direct{{background:#223f36;border-color:#528c77}} .badge.correlated{{background:#363229;border-color:#947b55}}
 .facts{{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}} .facts div,.loss-grid div{{background:#25374a;border:1px solid #3f5871;padding:11px}} .facts strong,.loss-grid strong{{display:block;margin-top:4px;line-height:1.35}} .loss-grid{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}} .loss-grid.one{{grid-template-columns:minmax(0,480px)}} .loss-grid strong{{font-size:24px}} .loss-grid small{{display:block;margin-top:3px;color:var(--muted)}} .evidence-note,.possible-losses,.muted{{color:var(--muted);font-size:13px;line-height:1.55;margin-top:10px}} .possible-losses{{border-left:3px solid #9e8157;padding-left:10px}}
 .empty-state{{padding:20px;border:1px dashed #a89170;background:#233347;line-height:1.55}} .table-wrap{{overflow-x:auto}} table{{width:100%;border-collapse:collapse;font:14px Arial,sans-serif}} th,td{{padding:9px;border-bottom:1px solid #40566b;text-align:left}} th{{background:#2c4157;font-size:11px;text-transform:uppercase;letter-spacing:.05em}} footer{{margin-top:45px;padding-top:18px;border-top:1px solid #456078;color:var(--muted);font-size:12px;line-height:1.55}}
-.investigator-tools{{display:flex;gap:12px;align-items:end;flex-wrap:wrap;padding:12px;background:#21354a;border:1px solid #3f5871}} .investigator-tools label{{display:flex;flex-direction:column;gap:5px;font:12px Arial,sans-serif}} .investigator-tools input,.investigator-tools button{{padding:9px;background:#0c1826;border:1px solid #6885a0;color:#fff;border-radius:4px}} .investigator-count{{font:12px Arial,sans-serif;color:#bdd1e4}} .battle-tools{{display:flex;flex-wrap:wrap;gap:12px;align-items:end;padding:13px;background:#21354a;margin:10px 0;border:1px solid var(--line);font:12px Arial,sans-serif}} .battle-tools label{{display:flex;flex-direction:column;gap:5px}} .battle-tools input,.battle-tools select{{background:#0c1826;border:1px solid #6885a0;border-radius:4px;padding:9px;color:#f2f6ff;min-width:165px}} .battle-shown{{color:#bdd1e4;padding-bottom:6px}} .audit-grid{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}} .audit-grid div{{padding:10px;background:#233a50;border:1px solid #47617b}} .audit-grid span{{display:block;color:#bad0e3;text-transform:uppercase;font:10px Arial,sans-serif}} .audit-grid strong{{display:block;margin-top:5px}} .evidence-audit{{padding:12px 0}} .participant-evidence{{margin-top:10px;padding:10px;border:1px solid #456078}} .participant-evidence summary,.theatre-breakdown summary{{cursor:pointer;color:#b9dafa}} .theatre-breakdown{{border:1px solid #456078;padding:12px;margin:16px 0;background:#203247}} tr[hidden]{{display:none}}
+.investigator-tools{{display:flex;gap:12px;align-items:end;flex-wrap:wrap;padding:12px;background:#21354a;border:1px solid #3f5871}} .investigator-tools label{{display:flex;flex-direction:column;gap:5px;font:12px Arial,sans-serif}} .investigator-tools input,.investigator-tools button{{padding:9px;background:#0c1826;border:1px solid #6885a0;color:#fff;border-radius:4px}} .investigator-count{{font:12px Arial,sans-serif;color:#bdd1e4}} .battle-tools{{display:flex;flex-wrap:wrap;gap:12px;align-items:end;padding:13px;background:#21354a;margin:10px 0;border:1px solid var(--line);font:12px Arial,sans-serif}} .battle-tools label{{display:flex;flex-direction:column;gap:5px}} .battle-tools input,.battle-tools select{{background:#0c1826;border:1px solid #6885a0;border-radius:4px;padding:9px;color:#f2f6ff;min-width:165px}} .battle-shown{{color:#bdd1e4;padding-bottom:6px}} .audit-grid{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}} .audit-grid div{{padding:10px;background:#233a50;border:1px solid #47617b}} .audit-grid span{{display:block;color:#bad0e3;text-transform:uppercase;font:10px Arial,sans-serif}} .audit-grid strong{{display:block;margin-top:5px}} .evidence-audit{{padding:12px 0}} .participant-evidence{{margin-top:10px;padding:10px;border:1px solid #456078}} .participant-evidence summary,.theatre-breakdown summary{{cursor:pointer;color:#b9dafa}} .theatre-breakdown{{border:1px solid #456078;padding:12px;margin:16px 0;background:#203247}} tr[hidden]{{display:none}} 
 .aftermath{{border:1px solid #477087;background:#192f41;padding:12px 16px;margin:20px 0}} .aftermath-run{{background:#2c6382;border:1px solid #8cbedb;color:#fff;font:700 13px Arial,sans-serif;padding:10px 14px;border-radius:5px;cursor:pointer}} .aftermath-run:disabled{{opacity:.55;cursor:wait}} .aftermath-stats{{font:bold 15px Arial,sans-serif;color:#cbebd8}} .aftermath-result{{margin-top:10px}}
 .war-card{{scroll-margin-top:72px;outline:none}} .war-card:target{{border-color:#89bade;box-shadow:0 0 0 2px #5c90bc}} #war-index{{scroll-margin-top:74px}} .war-index{{background:#17293b;border:1px solid #46617d;border-radius:7px;padding:14px;margin:18px 0 24px}} .war-index h3{{margin:0 0 5px}} .war-index-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:9px}} .war-index-card{{text-decoration:none;display:flex;align-items:flex-start;gap:11px;background:#22374d;border:1px solid #4e6b85;border-radius:6px;padding:12px;color:#f1f6fc;font:13px Arial,sans-serif;line-height:1.45}} .war-index-card:hover,.war-index-card:focus-visible,.war-step:hover,.war-step:focus-visible{{background:#315474;outline:2px solid #8cc2ec;outline-offset:2px}} .war-index-card span:nth-child(2){{flex:1;min-width:0}} .war-index-card strong,.war-index-card small,.war-step small{{display:block}} .war-index-card small,.war-step small{{margin-top:5px;color:#c6d6e7;font-weight:400}} .war-index-number{{font:700 15px Arial,sans-serif;color:#e9bd85}} .war-pager{{display:grid;grid-template-columns:1fr auto 1fr;gap:9px;align-items:stretch;margin:1px 0 20px;font:700 13px Arial,sans-serif}} .war-pager.bottom{{margin:24px 0 0}} .war-step,.war-index-return{{text-decoration:none;background:#233e55;color:#eef7ff;border:1px solid #6185a0;padding:10px 12px;border-radius:5px;min-width:0;line-height:1.4}} .war-index-return{{text-align:center;white-space:nowrap}} .war-step:last-child{{text-align:right}} .war-step.disabled{{opacity:.45;background:#172636;border-color:#415769}} .war-step small{{overflow-wrap:anywhere}} .war-chronicle{{border:1px solid #4b6880;background:#172c3e;padding:12px 15px;margin:18px 0}} .war-chronicle h4{{margin-top:3px}} .chronicle-milestones{{margin:10px 0;padding-left:25px;line-height:1.65}} .chronicle-milestones li{{padding:3px 0}} .chronicle-years,.chronicle-highlights,.battle-dossier,.wartime-tech{{margin:12px 0;padding:12px;background:#21374b;border:1px solid #496b86}} .chronicle-years summary,.chronicle-highlights summary,.battle-dossier summary,.wartime-tech summary{{cursor:pointer;color:#cae7fb;font:700 14px Arial,sans-serif}} .forensic-table{{border:1px solid #456078;background:#20374a;padding:12px;margin:11px 0}} .forensic-table summary{{cursor:pointer;font:700 14px Arial,sans-serif;color:#c8e5fa}} .forensic-table .table-wrap{{margin-top:10px}} .battle-reset,.theatre-filter{{border:1px solid #86acc6;border-radius:4px;background:#275676;color:white;font:700 12px Arial,sans-serif;padding:6px 8px;cursor:pointer}} .battle-dossier{{scroll-margin-top:75px}} .war-actions{{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:15px 0}} .war-actions button{{background:#2c6382;border:1px solid #8cbedb;border-radius:5px;padding:9px 12px;color:#fff;font:700 12px Arial,sans-serif;cursor:pointer}} .war-actions button:hover{{background:#347fa6}} .war-copy-feedback{{color:#c9e5d4;font:12px Arial,sans-serif}}
 @media(max-width:1200px){{.audit-grid{{grid-template-columns:repeat(2,1fr)}}.summary{{grid-template-columns:repeat(3,1fr)}}.facts{{grid-template-columns:repeat(2,1fr)}}}} @media(max-width:720px){{.war-pager{{grid-template-columns:1fr 1fr}} .war-index-return{{grid-column:1 / -1;grid-row:1}} .war-step{{font-size:12px}} .audit-grid{{grid-template-columns:1fr}}.summary,.facts,.loss-grid{{grid-template-columns:1fr}}.episode-head{{display:block}}.badge{{display:inline-block;margin-top:6px}}}}
@@ -849,7 +850,7 @@ document.addEventListener('DOMContentLoaded', function () {{
         target.replaceChildren();
         const stats = document.createElement('p');
         stats.className = 'aftermath-stats';
-        stats.textContent = data.before_date + ' → ' + data.after_date + ' · ' + data.player_gained + ' Commonwealth gains · ' + data.player_lost + ' losses · ' + data.changed_count + ' total controller changes';
+        stats.textContent = data.before_date + ' → ' + data.after_date + ' · ' + data.player_gained + ' gains for this civilisation · ' + data.player_lost + ' losses · ' + data.changed_count + ' total controller changes';
         target.appendChild(stats);
         const summary = document.createElement('p');
         summary.className = 'evidence-note';
@@ -944,16 +945,16 @@ document.addEventListener('DOMContentLoaded', function () {{
       lines.push((field.querySelector('span')?.textContent || 'Field').trim() + ': ' +
                  (field.querySelector('strong')?.textContent || '').trim());
     }});
-    const victory = card.querySelector('.war-confirmation');
-    if (victory) lines.push('', 'SCREENSHOT EVIDENCE', victory.textContent.replace(/\\s+/g, ' ').trim());
     const timeline = card.querySelector('.chronicle-milestones');
     if (timeline) {{
       lines.push('', 'EVIDENCE CHRONOLOGY');
       timeline.querySelectorAll('li').forEach(li => lines.push('- ' + li.textContent.trim()));
     }}
     const research = card.querySelector('.wartime-tech');
-    if (research && research.querySelectorAll('tbody tr').length) {{
-      lines.push('', 'RESEARCH FIRST OBSERVED DURING THE WAR (NOT CAUSED BY THE WAR)');
+    if (research) {{
+      lines.push('', 'RESEARCH EVIDENCE AND ARCHIVE COVERAGE');
+      const coverage = research.querySelector('.research-coverage');
+      if (coverage) lines.push(coverage.textContent.trim());
       research.querySelectorAll('tbody tr').forEach(function(row) {{
         lines.push('- ' + Array.from(row.querySelectorAll('td')).map(td => td.textContent.trim()).join(' · '));
       }});
@@ -967,7 +968,7 @@ document.addEventListener('DOMContentLoaded', function () {{
     }}
     lines.push('', 'EVIDENCE RULE: Formal battle outcome flags remain unverified. ' +
       'Loss totals are native battle records, not proof of specific ship destruction. ' +
-      'A victory notification is screenshot evidence, not a recovered treaty execution timestamp.');
+      'War-ending windows are bounded by archived saves; exact peace terms and outcomes remain unverified unless decoded from native game evidence.');
     return lines.join('\\n');
   }}
   document.querySelectorAll('.war-card').forEach(function(card) {{
@@ -1024,10 +1025,13 @@ document.addEventListener('DOMContentLoaded', function () {{
   }}
 }});
 </script>
+
+<link rel="stylesheet" href="/static/historian-theme.css?v=087">
+<script src="/static/historian-theme.js?v=087"></script>
 </head>
 <body>
 <header><div class="wrap"><div class="kicker">Stellaris Historian · Evidence-led military record</div><h1>War Journal</h1><div class="sub">{_e(campaign['empire_name'])} · archive through {_e(campaign['latest_game_date'])}</div></div></header>
-<nav><div class="wrap"><a href="#overview">Overview</a><a href="#formal-wars">Formal Wars</a><a href="#combat-episodes">Combat Episodes</a><a href="#investigation">Combat Investigation</a><a href="/journal">Historical Journal</a><a href="/campaign">Campaign Dashboard</a></div></nav>
+<nav><div class="wrap"><a href="#overview">Overview</a><a href="#formal-wars">Formal Wars</a><a href="#research-audit">Research Audit</a><a href="#combat-episodes">Combat Episodes</a><a href="#investigation">Combat Investigation</a><a href="/journal">Historical Journal</a><a href="/campaign">Campaign Dashboard</a></div></nav>
 <main>
 <section id="overview">
   <h2>Military Record Overview</h2>
@@ -1040,6 +1044,7 @@ document.addEventListener('DOMContentLoaded', function () {{
     <div class="stat"><span>Recorded fleets</span><strong>{len(fleets)}</strong></div>
     <div class="stat"><span>Recorded commanders</span><strong>{len(commanders)}</strong></div>
   </div>
+  <div class="principles"><strong>Save-only history:</strong> war titles, names, dates, endings and results originate exclusively from decoded save records or their processed caches. External screenshot notes and manually entered annotations are not consulted. Unknown outcomes and names remain unknown.</div>
   <div class="principles"><strong>Evidence rule:</strong> this journal separates formal wars from reconstructed combat episodes. A combat marker, disappearing ship or loss counter does not by itself prove a battle result, a war, or an individual ship's destruction. Formal battle result interpretation remains under review: the raw tactical attacker_victory field is retained and shown without presenting unverified player victories or defeats.</div>
   <div class="facts">
     <div><span>Systems appearing in combat evidence</span><strong>{_e(_join(systems))}</strong></div>
@@ -1049,10 +1054,11 @@ document.addEventListener('DOMContentLoaded', function () {{
   </div>
 </section>
 <section id="formal-wars"><h2>Formal Wars</h2><p class="evidence-note">Select a war below or use Previous / Next War inside a report. Keyboard: [ previous war, ] next war (outside form controls). Shareable links use stable war IDs.</p>{war_index_html}{war_html}</section>
+{research_audit_html}
 <section id="combat-episodes"><h2>Combat Episodes</h2>{episode_html}</section>
 <section id="investigation"><h2>Combat Investigation</h2><p class="evidence-note">Compare independently retained direct fleet-combat telemetry against nearby formal battle records. Player fleet IDs come from the native telemetry, independently of ambiguous fleet-name labels. No outcome is inferred.</p>{investigation_html}</section>
 <footer>
-  <strong>War Journal evidence audit — v0.0.70.</strong> This view is derived from the existing reviewed combat cache and shared presentation layer; it does not reparse Ironman saves. War-linked commissioning, refits, technology, diplomatic consequences and aftermath are deliberately not attributed to a specific conflict yet unless later evidence rules can make that linkage safely.
+  <strong>War Journal evidence audit — v0.0.71.1.</strong> This view is derived from the existing reviewed combat cache and shared presentation layer; it does not reparse Ironman saves. War-linked commissioning, refits, technology, diplomatic consequences and aftermath are deliberately not attributed to a specific conflict yet unless later evidence rules can make that linkage safely.
 </footer>
 </main>
 </body>

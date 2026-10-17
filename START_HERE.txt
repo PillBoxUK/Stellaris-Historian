@@ -1,0 +1,19 @@
+THE ART OF REMEMBERING EMPIRES
+Stellaris Historian — definitive monograph and handover archive
+Created by PillBoxUK | 17 October 2026 | documentation baseline v0.0.89
+
+This is a PUBLIC DOCUMENTATION ZIP — not a software update.
+
+READ / SHARE:  book/Stellaris_Historian_The_Art_of_Remembering_Empires.pdf
+EDIT IN WORD: book/Stellaris_Historian_The_Art_of_Remembering_Empires.docx
+PUBLISH:      upload the entire website/ folder, then open website/index.html
+SOURCE TEXT:  book/Stellaris_Historian_Complete_Monograph.md
+SQL REFERENCE: technical/CORE_SQLITE_SCHEMA_v0.0.89.sql
+DB DICTIONARY: technical/CORE_SQLITE_DATA_DICTIONARY_v0.0.89.csv
+
+The book contains 51 numbered sections and more than 12,500 words.
+No private Ironman saves, user databases, confidential paths, credentials or screenshots are included.
+Read PUBLICATION_README.md before website deployment.
+
+Project: https://github.com/PillBoxUK/Stellaris-Historian
+Game:    https://www.paradoxinteractive.com/games/stellaris/about

@@ -1,0 +1,19 @@
+Stellaris Historian v0.0.68 -- Military History Evidence patch
+
+Install over existing v0.0.67, then restart with start.bat.
+Do not delete or replace data/, autobackups/, archives, or existing SQLite DB.
+
+Contents:
+- app.py                                   /api/war-intelligence read-only endpoint
+- start.bat                                version label
+- historian/__init__.py                    application version
+- historian/war_journal.py                enemy-aware war titles and forensic UI
+- historian/war_intelligence.py           on-demand archived army/planet/station investigation
+- historian/war_party_names.json          specific confirmed Hulfiran name annotation
+- historian_manifest.json                 v0.0.68 manifest
+- README.md                                version pointer
+- README_v0.0.68.md                        install, limitations and test notes
+- PATCH_CONTENTS_v0.0.68.txt               manifest of patch contents
+
+No migrations. No permanent changes to the database. First on-demand investigation
+may take tens of seconds; per-save derived evidence is cached atomically.

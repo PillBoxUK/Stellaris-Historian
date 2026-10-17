@@ -1,0 +1,16 @@
+Stellaris Historian v0.0.69 — War Chronicle Verification and Background Investigations
+
+app.py
+start.bat
+historian/__init__.py
+historian/war_journal.py
+historian/war_intelligence.py
+historian/war_outcome_annotations.json
+historian_manifest.json
+README.md
+README_v0.0.69.md
+PATCH_CONTENTS_v0.0.69.txt
+docs/CHANGELOG.md
+test_v0_0_69.py
+
+Upgrade from v0.0.68; restart using start.bat; preserve all data and backups. No migrations.

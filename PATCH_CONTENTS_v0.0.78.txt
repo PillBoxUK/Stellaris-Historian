@@ -1,0 +1,20 @@
+Stellaris Historian v0.0.78 CLASSIC PATCH — FLAT ZIP
+
+README.md
+start.bat
+historian_manifest.json
+docs/CHANGELOG.md
+documentation/release_notes/README_v0.0.78.md
+app.py
+historian/__init__.py
+historian/timeline.py
+historian/story_text.py
+historian/timeline_rewrite.py
+static/campaign.html
+static/campaign.js
+static/style.css
+test_v0_0_76.py
+test_v0_0_77.py
+test_v0_0_78.py
+
+INSTALL: turn Live History OFF; close the app; back up overwritten files; copy ZIP contents into G:\codex\StellarisHistorian; restart original start.bat. No payload folder, no database migration, no save files.

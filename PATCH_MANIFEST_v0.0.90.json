@@ -1,0 +1,87 @@
+{
+  "application": "Stellaris Historian",
+  "patch_version": "0.0.90",
+  "base_version": "0.0.89",
+  "delivery": "Overlay only: extract into the existing source folder; do not replace data or .sav files",
+  "historical_evidence": "Only archived Ironman saves and derived verified databases. No screenshots.",
+  "no_database_migration": true,
+  "restart_historian": true,
+  "restart_stellaris": false,
+  "files": [
+    {
+      "path": "historian/__init__.py",
+      "bytes": 23,
+      "sha256": "83935456c10ba65053d01814b96e55c00de31837d90fe4f1b38772d9c7d06b06"
+    },
+    {
+      "path": "historian/annals_editorial.py",
+      "bytes": 3831,
+      "sha256": "1aa51d3a355509ee9c956bf70e5a62dd5eea0e5b948632cb75c3f6036c267e32"
+    },
+    {
+      "path": "historian/timeline.py",
+      "bytes": 108579,
+      "sha256": "11868fbf63f7e97bceccd30a115579f97d5843a6bff1f3d71ae3f03c41f758bc"
+    },
+    {
+      "path": "static/historian-theme.css",
+      "bytes": 14369,
+      "sha256": "82726237dc4d7a776da93b1020d720e042847c31e9155bcab6ffba446441b9dc"
+    },
+    {
+      "path": "historian_manifest.json",
+      "bytes": 22750,
+      "sha256": "6332d1b9a1dac0d71ba41d12300b2f6b5b123e78e497a1e6653b100c73b85198"
+    },
+    {
+      "path": "start.bat",
+      "bytes": 15019,
+      "sha256": "52dd8f835c1c5bbc86b1dc8e7788b8773196823b5377e62c4366136ee1e283d7"
+    },
+    {
+      "path": "README.md",
+      "bytes": 23667,
+      "sha256": "7ecbeadcc48f1be1ea6c379e2111b40933a5da001494409aa3b3dcd227c1c6c9"
+    },
+    {
+      "path": "README_PATCH_v0.0.90.txt",
+      "bytes": 1627,
+      "sha256": "89610f3d539d4979b1d81b4b3216fe0625621908eee82018971c0f94daedeab4"
+    },
+    {
+      "path": "docs/CHANGELOG.md",
+      "bytes": 57861,
+      "sha256": "f9e55ac9ede05101dd9d05ace3a572bd3e772442c8d04f336ad3bf1a5861e768"
+    },
+    {
+      "path": "docs/RELEASE_v0.0.90.md",
+      "bytes": 7366,
+      "sha256": "f21bf6113d03ea2064d3c812ffeeb3953c50d73e04aefdd3951f336f880893dc"
+    },
+    {
+      "path": "roadmap/ROADMAP.md",
+      "bytes": 3728,
+      "sha256": "b5b294e06f187d1ccbb374d8399598ae0fe36613f067470e55c02a25ef2d45ad"
+    },
+    {
+      "path": "tests/test_v0_0_90.py",
+      "bytes": 3559,
+      "sha256": "56e2b4fab57cab81eb7c6669303cfa236daf70a72e3a8c544a7cf4adeedc6ad6"
+    },
+    {
+      "path": "tests/test_banner_v0_0_87_1.py",
+      "bytes": 1400,
+      "sha256": "3cf56d05fc2ea3cad5db72018a387b7e3b9a88d673ec205d4891e2488245edcb"
+    },
+    {
+      "path": "tests/test_theme_v0_0_87.py",
+      "bytes": 1835,
+      "sha256": "3141d805438a2cc63c3a04bd48643c7b35770a83dc9b9737e34285c1a4921a0b"
+    },
+    {
+      "path": "tests/test_v0_0_85_1.py",
+      "bytes": 4879,
+      "sha256": "230df5e25157cfe43acfb17471ef8de69b132c1fb289504523be30195df163ee"
+    }
+  ]
+}

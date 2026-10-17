@@ -1,0 +1,14 @@
+Stellaris Historian v0.0.70 — War Journal Mega Update
+
+start.bat
+historian/__init__.py
+historian/war_journal.py
+historian_manifest.json
+README.md
+README_v0.0.70.md
+PATCH_CONTENTS_v0.0.70.txt
+docs/CHANGELOG.md
+test_v0_0_70.py
+
+Upgrade from v0.0.69. Restart using start.bat. No migrations, Review Campaign or Construct Campaign needed.
+Preserve data, .sav archives, SQLite, autobackups and .historian_evidence. No GitHub changes.

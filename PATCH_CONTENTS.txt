@@ -1,0 +1,30 @@
+Stellaris Historian v0.0.54 — Processed Combat Diagnostic Synchronization
+
+Install by extracting this patch directly over the existing StellarisHistorian folder, then restart with start.bat.
+
+Patch files:
+- start.bat
+- historian/__init__.py
+- migrate_v0_0_54.py
+- README.md
+- README_v0.0.54.md
+- docs/MIGRATION_v0.0.54.md
+- VALIDATION_v0.0.54.txt
+- SHA256SUMS.txt
+
+The migration updates these installed files in place and backs them up first:
+- app.py
+- historian/snapshot_cache.py
+- historian/history_processor.py
+- historian/presentation_history.py
+- historian_manifest.json
+- docs/CHANGELOG.md
+
+Behaviour added:
+- Combat_Evidence_Debug.txt, Combat_Correlation_Debug.txt and Combat_Episode_Debug.txt synchronize from processed snapshot cache after History catch-up.
+- Manual Update History can perform this synchronization even when no new saves are waiting.
+- Live History keeps queue-first scheduling and synchronizes combat diagnostics only after the queue reaches zero.
+- Cache-only synchronization refuses raw .sav fallback.
+- War Journal / Timeline / Scribes cached evidence ignores archived-but-unprocessed snapshots.
+
+No database schema change, parsed-cache component version bump, archived-save rewrite or full cache rebuild is required.

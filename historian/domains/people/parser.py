@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 
 from ...localisation import resolve_localisation_key
+from ...core.name_display import clean_stellaris_name
 from ...save_reader import EmpireProfile
 from ..worlds.parser import world_location_display_name
 from ...core.stellaris_text import (
@@ -657,6 +658,10 @@ def extract_leader_snapshot(
             source_save,
             fallback=f"Leader {leader_id}",
         )
+        # Resolve Stellaris's conditional name grammar using the saved gender.
+        # The raw save is untouched; previously cached names are cleaned again
+        # only at presentation time.
+        name = clean_stellaris_name(name, _scalar(record, "gender"))
 
         leader_class = (
             _scalar(

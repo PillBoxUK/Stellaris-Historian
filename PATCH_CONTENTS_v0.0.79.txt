@@ -1,0 +1,26 @@
+Stellaris Historian v0.0.79 CLASSIC PATCH — FLAT ZIP
+
+REQUIRES: installed v0.0.78
+INCLUDES: enhanced timeline prose + Physics/Society/Engineering research ledger and dossier
+
+README.md
+start.bat
+historian_manifest.json
+docs/CHANGELOG.md
+documentation/release_notes/README_v0.0.79.md
+app.py
+historian/__init__.py
+historian/history_processor.py
+historian/research_history.py
+historian/timeline.py
+historian/timeline_rewrite.py
+static/campaign.html
+test_v0_0_76.py
+test_v0_0_78.py
+test_v0_0_79.py
+
+INSTALL: stop Live History and exit; back up overwritten application files;
+copy ZIP content into G:\codex\StellarisHistorian; restart original start.bat.
+Then use Manage Campaign -> Rewrite Timeline (Live History OFF) to backfill old research queues.
+Main SQLite historian.db and .sav files are never in the ZIP. No migration/Construct Campaign.
+Research ledger generated later at <campaign archive>/Research_History.sqlite3.

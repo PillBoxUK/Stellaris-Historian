@@ -1,0 +1,24 @@
+STELLARIS HISTORIAN v0.0.77 — THE LIVING ANNALS
+
+New classic flat ZIP — 16 October 2026. Built from current v0.0.76 source, not earlier releases.
+Extract over G:\codex\StellarisHistorian AFTER quitting the app and backing up affected code files.
+No saves, databases, data, .venv, logs, config.json, backup paths or personal material packaged.
+Includes paper-and-ink HTML redesign and dynamic natural chronicle across all selected timeline event types.
+WAR: native start and archive-presence bounds, no invented peace dates.
+PEOPLE: separate recruitment and first observed assignments.
+NAVY: exact valid commissioning dates vs later fleet and commander observations.
+COMBAT: sourced opening/closing dates, systems, commanders, aggregate losses; no unproven named casualties or MIA.
+STORY: no inferred choices from wiki content.
+No schema migration; restart application to load code. Local /timeline generates afresh when opened.
+
+FILES:
+README.md
+start.bat
+historian_manifest.json
+historian/__init__.py
+historian/timeline.py
+docs/CHANGELOG.md
+documentation/release_notes/README_v0.0.77.md
+test_v0_0_75.py
+test_v0_0_76.py
+test_v0_0_77.py

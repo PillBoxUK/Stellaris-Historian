@@ -117,16 +117,6 @@ startButton.addEventListener("click", async () => {
   }
 });
 
-closeButton.addEventListener("click", async () => {
-  closeButton.disabled = true;
-  closeButton.textContent = "Closing...";
-
-  try{
-    await fetch("/app/close", {method:"POST"});
-  }catch{}
-
-  status.textContent =
-    "Historian closed. You can close this browser tab.";
-});
+closeButton.addEventListener("click", () => window.HistorianClose(closeButton, status));
 
 loadCampaigns();

@@ -22,6 +22,7 @@ from .domains.people.evidence_diagnostic import (
 from .save_reader import EmpireProfile, read_empire_profile
 from .domains.ships.history import derive_full_history, transition_data
 from .snapshot_cache import campaign_cache_dir, clear_campaign_cache, load_or_parse_snapshot
+from .research_history import capture_observation
 from .domains.worlds.history import derive_full_world_history, world_transition_data
 from .domains.science.diagnostic import (
     science_evidence_summary,
@@ -338,7 +339,7 @@ def refresh_processed_combat_diagnostics(db: Database, campaign_id: int) -> dict
     }
 
 
-def process_unprocessed(db: Database, campaign_id: int) -> dict:
+def process_unprocessed(db: Database, campaign_id: int, *, progress=None) -> dict:
     started = time.perf_counter()
 
     # v0.0.47 could commit the normal history row but fail before setting the
@@ -364,6 +365,8 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
     parsed_in_run: dict[int, tuple] = {}
 
     for index, snapshot in enumerate(snapshots, start=1):
+        if progress and (index==1 or index%8==0 or index==total):
+            progress(index,total,f'Reconstructing evidence from save {index}/{total}')
         activity(
             f"[{index:02d}/{total:02d}] {snapshot['game_date']} - "
             f"{snapshot['archive_filename']}"
@@ -580,6 +583,25 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
             )
             processed += 1
 
+            # Optional, isolated research-queue evidence. Never replay an
+            # already-processed save because the extra research parse fails.
+            try:
+                research_result = capture_observation(
+                    Path(campaign["archive_dir"]),
+                    Path(snapshot["archive_path"]),
+                    str(snapshot["sha256"]),
+                )
+                if not research_result["cached"]:
+                    activity(
+                        "         RESEARCH QUEUES captured in "
+                        f"{research_result['seconds']:.2f}s (3 disciplines)"
+                    )
+            except Exception as research_exc:
+                warning(
+                    f"RESEARCH EVIDENCE - {snapshot['archive_filename']}: "
+                    f"{research_exc}; canonical save processing retained"
+                )
+
             if politics_delta is not None:
                 try:
                     db.apply_politics_delta(
@@ -707,7 +729,7 @@ def process_unprocessed(db: Database, campaign_id: int) -> dict:
         "cache_misses": cache["miss"],
     }
 
-def review_campaign(db: Database, campaign_id: int) -> dict:
+def review_campaign(db: Database, campaign_id: int, *, progress=None) -> dict:
     """Rebuild derived history without changing processed snapshot flags."""
     started = time.perf_counter()
     snapshots = db.all_snapshots(campaign_id)
@@ -728,6 +750,8 @@ def review_campaign(db: Database, campaign_id: int) -> dict:
     cache = _cache_counter()
 
     for index, snapshot in enumerate(snapshots, start=1):
+        if progress and (index==1 or index%8==0 or index==total):
+            progress(index,total,f'Reconstructing evidence from save {index}/{total}')
         activity(
             f"[{index:02d}/{total:02d}] {snapshot['game_date']} - "
             f"{snapshot['archive_filename']}"

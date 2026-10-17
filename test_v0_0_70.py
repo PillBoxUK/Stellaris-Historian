@@ -70,14 +70,14 @@ assert 'coverage unavailable' in _war_technology_html(records[1],(),snapshots_av
 
 assert [w.war_id for w in records] == [67108865,83886080,100663296]
 assert records[1].first_absent_after_last == '2300.10.01'
-assert _war_victory_annotation(records[1],'Commonwealth of Man')['notification_date']=='2300.08.15'
-assert _war_victory_annotation(records[2],'Commonwealth of Man')['notification_date']=='2303.02.14'
+assert _war_victory_annotation(records[1],'Commonwealth of Man') is None
+assert _war_victory_annotation(records[2],'Commonwealth of Man') is None
 assert _war_anchor(records[2].war_id)=='war-100663296'
 
 index=_war_index_html(records,'Commonwealth of Man')
 assert index.count('class="war-index-card"')==3
-assert 'War of Humiliation against Hulfiran United Stars' in index
-assert 'Screenshot' not in index or 'screenshot' in index.lower()
+assert 'War of Humiliation' in index and 'Hulfiran' not in index
+assert 'Victory notice' not in index
 for pos in range(3):
     top=_war_nav_html(records,pos,'Commonwealth of Man')
     bottom=_war_nav_html(records,pos,'Commonwealth of Man',at_bottom=True)
@@ -89,13 +89,13 @@ for pos in range(3):
     if pos<2: assert f'href="#war-{records[pos+1].war_id}"' in top
 
 chron=_war_chronology_html(records[1],_war_victory_annotation(records[1],'Commonwealth of Man'))
-assert '2300.08.15' in chron
+assert '2300.08.15' not in chron
 assert '2297' in chron and '2298' in chron
 assert 'Incomplete' in chron  # one battle has no casualty figure
 assert '11 recorded Commonwealth ship losses' in chron
 assert '2297.09.10' in chron
 assert '2297.06.28' in chron
-assert 'exact treaty day' in chron.lower() or 'exact treaty' in chron.lower()
+assert 'not proof of war outcomes' in chron.lower()
 undated=replace(b2,date='0.01.01',player_losses=None)
 undated_war=replace(records[1],battles={undated.battle_key:undated},battle_first_seen={undated.battle_key:'2298.07.01'})
 assert 'No dated player-involved formal battles' in _war_chronology_html(undated_war,None)
@@ -108,7 +108,7 @@ assert brief_html.count('class="war-pager')==2
 assert 'Copy war brief' in brief_html and 'Save war brief' in brief_html
 assert 'data-location=' in brief_html and 'battle-dossier' in brief_html
 assert '29' not in brief_html or 'battle' in brief_html
-assert 'war-confirmation' in brief_html
+assert 'war-confirmation' not in brief_html
 assert 'Not verified from archived war' in brief_html
 assert '11 recorded Commonwealth ship losses' in brief_html
 # malicious save-data names may contain HTML-like text: output must escape them
@@ -175,7 +175,7 @@ with TemporaryDirectory() as d:
             assert download.suggested_filename=='Stellaris_War_83886080_Brief.txt'
             brief_path=Path(d)/'export.txt';download.save_as(brief_path)
             content=brief_path.read_text()
-            assert '2300.08.15' in content and 'battle' in content.lower() and 'Energy Grid' in content, repr(content[:2200])
+            assert '2300.08.15' not in content and 'battle' in content.lower() and 'Energy Grid' in content, repr(content[:2200])
             browser.close()
         print('Chromium interactive navigation, theatre filter, export PASS')
     except ImportError:

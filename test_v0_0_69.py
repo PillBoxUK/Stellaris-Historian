@@ -1,4 +1,4 @@
-"""v0.0.69 milestone: scoped screenshot outcome, battle-field honesty, v68 cache upgrade."""
+"""v0.0.69 native battle/cache regression, updated for v0.0.71.1 save-only evidence."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import json,hashlib,sys,time
@@ -16,17 +16,17 @@ def war(wid=WAR,start='2293.04.26',last='2300.07.01',end='2300.10.01'):
 
 one=war()
 a=_war_victory_annotation(one,'Commonwealth of Man')
-assert a and a['notification_date']=='2300.08.15'
+assert a is None
 html=_formal_war_html(one,'2300.10.01','Commonwealth of Man')
-assert 'Screenshot-confirmed Commonwealth victory notification: 2300.08.15' in html
+assert 'Screenshot-confirmed' not in html
 assert 'Not verified from archived war' in html
-assert 'Exact treaty execution day is not independently recovered' in html
+assert 'Ending observed between 2300.07.01 and 2300.10.01' in html
 assert not _war_victory_annotation(war(start='2293.04.27'),'Commonwealth of Man')
 assert not _war_victory_annotation(one,'Another campaign')
 assert not _war_victory_annotation(war(last='2300.10.01',end='2301.01.01'),'Commonwealth of Man')
 sil=war(wid=100663296,start='2301.06.12',last='2303.01.01',end='2303.04.01')
-assert _war_victory_annotation(sil,'Commonwealth of Man')['notification_date']=='2303.02.14'
-print('War-ending screenshot-scoped annotation / rejection tests PASS')
+assert _war_victory_annotation(sil,'Commonwealth of Man') is None
+print('War-ending native-archive-only audit PASS')
 
 p=ROOT/'ironman-399.sav'
 assert p.is_file()

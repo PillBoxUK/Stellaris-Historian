@@ -7,6 +7,7 @@ import shutil
 import time
 
 from .core.stellaris_text import indexed_scan_scope
+from .civic_frontier import capture as capture_civic_frontier
 from .domains.people import CACHE_COMPONENT_NAME as LEADER_COMPONENT_NAME
 from .domains.people import CACHE_COMPONENT_VERSION as LEADER_COMPONENT_VERSION
 from .domains.people.models import LeaderSnapshot
@@ -596,10 +597,19 @@ def load_or_parse_snapshot(
         # because assignments can depend on the newly parsed ship/fleet state.
         if profile is not None:
             phase_started = time.perf_counter()
-            _, gamestate = read_save_texts(
+            meta, gamestate = read_save_texts(
                 archive_path
             )
             mark_timing("zip_read", phase_started)
+            try:
+                evidence_started = time.perf_counter()
+                # Additive sidecar; failures may not stop normal save ingestion.
+                capture_civic_frontier(archive_path.parent, archive_path,
+                                       source_sha256, meta=meta,
+                                       gamestate=gamestate, profile=profile)
+                mark_timing('civic_frontier', evidence_started)
+            except Exception:
+                pass
 
             ship_was_refreshed = (
                 ship_snapshot is None
@@ -737,6 +747,13 @@ def load_or_parse_snapshot(
             gamestate,
         )
         mark_timing("profile", phase_started)
+        try:
+            evidence_started = time.perf_counter()
+            capture_civic_frontier(archive_path.parent, archive_path,
+                                   source_sha256, meta=meta, gamestate=gamestate, profile=profile)
+            mark_timing('civic_frontier', evidence_started)
+        except Exception:
+            pass
 
         phase_started = time.perf_counter()
         ship_snapshot = extract_ship_fleet_snapshot(

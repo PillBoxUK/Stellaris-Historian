@@ -1,0 +1,13 @@
+Stellaris Historian v0.0.80 — flat-root patch
+
+README.md
+start.bat
+historian_manifest.json
+docs/CHANGELOG.md
+documentation/release_notes/README_v0.0.80.md
+historian/__init__.py
+historian/core/name_display.py
+historian/domains/people/parser.py
+historian/timeline.py
+test_v0_0_79.py
+test_v0_0_80.py

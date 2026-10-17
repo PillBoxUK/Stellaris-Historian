@@ -1,0 +1,29 @@
+Stellaris Historian v0.0.82 — The Civic & Frontier Chronicle
+
+INSTALLATION — CLASSIC FLAT-ROOT PATCH
+- Close Historian after Live History has finished and is OFF.
+- Back up data/ and your installation before applying.
+- Extract directly into G:\codex\StellarisHistorian, overwrite application files.
+- Start the original root start.bat; confirm v0.0.82.
+- With Live History OFF, Manage Campaign → Update Historical Timeline
+  to backfill political/infrastructure evidence from archived saves.
+- New saves are indexed incrementally; no canonical database migration.
+- A full backfill revisits the archive and may take considerable time.
+
+ADDED
+- Dated government/ethics/civics/ruler/council/agenda and policy transitions.
+- Sector administration and colony governor/designation timeline entries.
+- First-observed system discovery and owned-starbase territorial control.
+- Native mining, research and orbital-station evidence and commissioned dates.
+- Starbase level and new-module/building transitions.
+- Civic & Frontier History searchable research page.
+- Four cache reads per archive consolidated to one for shared historical views.
+- More careful game text handling, shorter print-page orphaning.
+- New development test under tests/ rather than loose at installation root.
+
+LIMITATIONS
+- System discovery does not prove a completed system survey.
+- Archived state snapshots do not capture every popup choice or exact transition.
+- Station first-observed dates without an in-window native build date are not exact.
+- No user files, archived .sav, .sqlite3, config, or campaign data included.
+- No GitHub changes.

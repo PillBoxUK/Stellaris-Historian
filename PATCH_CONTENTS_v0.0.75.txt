@@ -1,0 +1,19 @@
+Stellaris Historian v0.0.75 classic patch
+
+README.md
+app.py
+docs/CHANGELOG.md
+documentation/release_notes/README_v0.0.75.md
+historian/__init__.py
+historian/timeline.py
+historian/empire_archive.py
+historian/time_machine.py
+historian_manifest.json
+start.bat
+static/campaign.html
+static/campaign.js
+static/style.css
+test_v0_0_75.py
+
+Install: close Historian and Live History, back up replaced application files, copy flat ZIP contents into G:\codex\StellarisHistorian, restart original start.bat.
+No saves, data, databases, config, or cache files are included.

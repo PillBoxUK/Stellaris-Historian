@@ -1,4 +1,127 @@
+# v0.0.90 — The Readable Annals
+
+- Editorial excerpts grouped by genuine game months and years, with Highlights/Standard/Complete presentation, precise date-kind labels and no inferred events.
+- Saved-ID linked leader stories and uniquely linked dated war references in existing detail cards.
+- Personal browser-only pins, annotations and year chapter titles; selected-year HTML export distinguishes author notes from source history.
+- Consistent dark/light/print styling, new roadmap and release version/test contract updates.
+- Source-only patch; no saved-game, parser, watcher, database, schema or cache changes. Restart Historian using `start.bat`.
+
+## v0.0.82 — The Civic & Frontier Chronicle
+
+- New campaign-local, SHA-256-indexed `Civic_Frontier_History.sqlite3` evidence sidecar. Tracks changing authority, government, civics, ethics, ruler IDs, council agendas and council office types, policy flags, sectors, known star systems, player-owned mining/research/observation stations, starbases, level upgrades and added modules/buildings.
+- Adds conservative, chronologically ordered political, territorial, discovery and infrastructure accounts to the canonical Imperial Annals. Original game-country perspective and first-observed dating are preserved. Initial holdings are baseline state, not fabricated new construction.
+- Planetary governor and designation transitions already derived by the Worlds history parser are now included as dated timeline entries (no invented officeholders).
+- Update Historical Timeline backfills the sidecar from the original Ironman archive, with parser-version invalidation and a separate failure list. New saves collected during a cold parse feed the sidecar from the existing decoded gamestate, not a second ZIP open. Sidecar errors are isolated from normal save processing.
+- Presentation History now JSON-decodes each saved evidence cache once instead of up to four times. Print CSS allows long years to flow across pages without orphaned year headings.
+- Limitations: native `galactic_object.discovery` documents awareness of a system, **not a completed survey**. Station timestamps are verified construction dates when available; subsequent first appearances are observation dates. Governments on non-owned planets, exact anomaly choices and precise territorial cession causes are not invented. No canonical DB schema migration.
+
+## v0.0.81 — The Great Chronicle Rebuild
+- **Update Historical Timeline** now invokes full Review Campaign re-derivation over every archived save, rather than checking only metadata and research. Before any derived SQL records are changed, creates a consistent SQLite backup under `data/autobackups/`. On source errors the old published timeline is not overwritten.
+- Versioned combat cache upgraded to **v4**: the first full rebuild reparses this component to extract **direct war-record** attacker/defender exhaustion, preserving raw fractions without interpreting them as percentages or confusing nested battle-local fields.
+- Opening civilisation story reads the **founding species and its saved species class, traits, name, homeworld, government, ethics, civics and origin** from the earliest archived save, with optional installed Stellaris origin lore. Hive Minds are not mislabelled as machines. This is multi-paragraph prose, not a fact card.
+- The Empire Timeline integrates **native dated player-country milestones** including first precursor discovery, first espionage, important discoveries, and exact war victories. The galaxy-wide founding of the Galactic Community and Council are dated from native saved fields. Only uniquely and independently identified victories link to particular wars; unsupported story options and treaty terms are excluded.
+- Adds `Native_Evidence.sqlite3` in each campaign archive, retaining native event identifiers, typed references and source hashes for future extraction work. No canonical table migration.
+- **Every event is re-sorted by its in-game date after war starts are inserted**, fixing declarations appearing after battles later in the year. An empty war rail is hidden for peaceful campaigns. Game text is cleaned for obvious scripted placeholders and third-person narrative.
+- New test harness covers real opening species evidence, synthetic biological Hive Mind, user-proof war exhaustion, native event conservation, and the complete SQLite-backed reconstruction workflow. All generated source-code updates require an app restart.
+- Known limitations: native player event popups and choices that disappear between quarterly saves cannot be reliably recovered without stronger evidence; unrelated alien galaxy knowledge is not included. War-wide exhaustion uses raw engine fractions because UI mapping is not independently validated. Do not treat archived visibility as exact event date.
+
+## v0.0.80 — First-Year Machine Chronicle Repair
+- Resolve Stellaris saved conditional-gender name grammar with the actual saved leader gender during ingestion. Older SQLite names are normalised at timeline render time without changing source records or evidence.
+- De-duplicate two kinds of misleading paired events: identical named story investigations, and the same ship arriving twice under naval/exploration headings on the same date.
+- Give gestalt machine polities a historically appropriate opening instead of administrative lists and human-specific descriptions; avoid gendered pronouns for science, colony and construction craft.
+- Research-queue milestones omit raw research-point tallies from the public prose; their precise queue dates and progress remain in evidence cards and Research History.
+- Preserve the separation of observation dates and actual event dates. No unsupported Shroud or event popup choices are reconstructed from screenshots or snapshot gaps.
+- No schema migration, full reprocessing, cached historical data rewrite or additional per-save scanning.
+
+## 0.0.79
+- Research queues for Physics, Society and Engineering collected from native Ironman save fields in an optional campaign-local sidecar.
+- Timeline Rewrite backfills the existing archives incrementally, reusing already captured queue observations.
+- Fleet, science, technology and research entries now publish dated meaning on the timeline, reserving evidence limitations for their reverse cards.
+- Research collection is non-critical and never marks a canonical snapshot unprocessed.
+
+## v0.0.78 — Chronicle Reconstruction & Story Texts
+- Archive-safe **Rewrite Timeline** worker checks every save metadata header and cache, regenerates timeline atomically and publishes an audit without touching canonical SQLite tables, saves or Live History flags.
+- Game-installation-aware English script text lookup enriches narrative entries for archaeological sites, projects and situations, without inventing dialogue selections or outcomes. Explicit **Use Game Texts** folder control.
+- Founding history grounded in native political authority, ethics, civics and origins, technology chronicle coverage broadened, and better dated leader/ship/colony language.
+- Forces campaign CSS/JS asset refresh (v078) and adds regression checks for local game text, archive inspection and safe regenerated HTML.
+- No save parser, DB schema, cache-version or GitHub changes.
+
+## v0.0.77 — The Living Annals
+- Render the approved Imperial Annals concept dynamically from the selected campaign's existing recorded evidence, preserving top-to-bottom years and native war spans.
+- Split exact service/commission dates from subsequent fleet and leader assignments, keeping first-observed qualifications on reverse-side evidence cards.
+- Natural chronological prose across people, ships, combat, science, colonies, and public historical notes, with contextual source-based details.
+- Add formal war-start entries linking to the War Journal, dated ruler and fleet assignments, source/precision labels, year jump and parchment-print CSS.
+- Never infer named ship losses, retreat, MIA or return, or unrecorded player choices from aggregate figures or wiki text.
+- No schema migration, history reset, manual GitHub publish, or private data changes.
+
+## v0.0.76 — Fleet Rolls & Story Threads
+
+- Expanded save-derived ship and scientific story chronicle; government-aware wording with no invented choices or motives.
+- Fixed stale campaign stylesheet asset version and Observatory card/menu responsiveness.
+
+## v0.0.75 — The Imperial Annals
+
+- Consolidate the campaign toolbar to Live History, Explore History and Manage Campaign; archive access is grouped in the Observatory.
+- Retire the duplicate interactive timeline; old URLs redirect to the canonical vertical Empire Timeline.
+- Add a multi-year War Period rail using native war start dates and last retained observations (not inferred peace dates).
+- Add clickable event and war cards with a close button at top-left, draggable title bar, flip side for dating notes, and links to the War Journal and Empire Archive.
+- Revise the timeline narration to remove player/game terminology, technical narrator language, and unfounded certainty.
+- No schema changes, raw-save processing changes, or destructive migrations.
+
+## v0.0.74 — Galactic Observatory and Nine-Chapter Scribes Chronicle
+- Added a separate **Empire Time Machine** page with an actual processed-save date slider (same-day archives grouped), step/play/pause, direct date selection and event dossiers with source, confidence and date precision.
+- Combined the reviewed interactive timeline evidence (including technology, combat and First Contact) with read-only SQLite political-state observations for historically dated government, rulers, ethics, civics, traditions and diplomacy contact records.
+- Registry overlap spans are always described as *first/last sighting windows*, never exact contemporary ship/leader/colony census. Latest attributes and populations are not projected backwards.
+- Added chapter VIII **The Chambers of Power** from published political-history records; the ending becomes chapter IX. Federation/Community claims remain absent unless independently published by save-derived evidence.
+- Reworked the **Scribes Chronicle** HTML reader: clickable contents, night reading, reading progress, chapter highlighting, and an atmospheric starfield/ornamental cover.
+- Reworked Scribes PDF with a deterministic vector galaxy/astral cover and contents; no external assets.
+- Corrected accidental "Convocation" references when writing a Commonwealth chronicle, misleading reused planet founding dates, and fictional-looking chapter signatures.
+- Added a prominent **Historical Observatory** library to the campaign dashboard that links to all six existing/new views. Both classic and interactive timelines are preserved.
+- New `test_v0_0_74.py` covers same-day archive boundaries, filtered unpublished observations, XSS escaping, historical political-state provenance, browser controls, Scribes and PDF export.
+- Existing save watcher, migrations, SQLite schema and history processor are not changed. No full Review/Construct is required.
+
 # Changelog
+
+## v0.0.73 — Interactive Empire Timeline
+- Standalone `/interactive-timeline` web page with time scrubber, play/pause, date jump, year-density chart and click-to-open event details.
+- Filtered historical streams: colonies, fleet/space combat, explicitly supported ground evidence, technology, First Contact, government, internal Imperial Council agendas, federations, Galactic Community, diplomacy, leaders, navy and science.
+- Uses existing SQLite, reviewed history cache, and the already-published First Contact diagnostic JSON; no raw save reparsing or new database schema.
+- Separates first-observed archive dates from dates supported by native save fields. Unpublished technical observations opt-in only.
+- Federation and Galactic Community streams explicitly show a coverage gap until their event types are independently decoded; internal council agenda changes are not misidentified as Galactic Community decisions.
+- Interactive JSON export, navigation to existing archive and journals, HTML escaping, atomic report publication and regression tests.
+- No change to Live History or to war/event parsing, campaign saves, or user data.
+
+
+## v0.0.72 — Empire Archive (Non-war history)
+- New locally generated `/empire-archive` view and dashboard button.
+- Reads the existing SQLite history and registries for leadership, worlds, ships, fleets, diplomacy and foundational observations, without reparsing saves or rebuilding caches.
+- Searchable chronological event feed with category, source, date precision and confidence; technical/unpublished events are hidden by default and explicitly labelled when shown.
+- Per-leader, world, ship and fleet registry inspectors link available entity events by stable recorded IDs.
+- Latest known population, assignments, deployments and observed bounds are labelled as observations, not retrospective exact event dates, births, deaths or battle losses.
+- Offline JSON and CSV exports; HTML publication uses atomic replace to preserve the last good file on write failures.
+- Uses processed history entries only and blocks an archive render when an unprocessed backlog exists.
+- No external services, screenshot annotations, migrations, SQLite schema/cache change, War Journal adjustments or Live History pipeline change.
+
+
+## v0.0.71.1 — Save-only historical evidence policy
+- Drops manually entered screenshot victory notifications from war cards, index, chronology and exported briefs.
+- Ignores manual war-title and opposing-country name annotations; resolves display names only from native war records or decoded saved diplomatic/combat identities.
+- Retains archive-bounded war disappearance and territorial aftermath evidence, without promoting those observations to unverified victory or peace terms.
+- Adds visible save-only provenance explanation; keeps unverified outcomes unverified.
+- Preserves all existing user annotation files without reading them. No data/cache/database/migration/Live History changes.
+
+
+## v0.0.71 — Research Date Integrity & Archive Evidence Audit
+- Groups cached technology observations by distinct in-game date before reconstructing acquisitions. Conflicting/same-day saves no longer create impossible `after X and by X` intervals.
+- Uses a cumulative maximum observed researched level per technology key. Previously observed completed techs cannot become fictitious discoveries if an intermediate snapshot temporarily omits a key or reports a lower level.
+- Adds defensive acquisition-window formatter for legacy events with invalid, identical, or inverted bounds. All new intervals derive from strictly earlier distinct archive dates.
+- Technology Evidence Debug reports unique archive days, duplicate-date archives, same-day differing states and unparseable dates. No data/cache is modified.
+- Adds a global read-only Technology Archive Audit section showing archive/date counts, source-date disagreements and the range of research coverage.
+- War Journal displays within-war technology cache coverage, indicates unavailable coverage rather than claiming research stopped, and flags any observation window crossing the first archived war date.
+- Saved/copied war briefs include the research coverage and war-boundary caveats.
+- Updates README navigation links to the organised release-notes folder and corrects current-version references.
+- Does not change SQLite schema, parsed cache component versions, archived Ironman saves, combat/war records, or the incremental Live History processing pipeline. No migration necessary.
+
 
 ## v0.0.70
 - Adds chronological war index with direct `#war-ID` bookmarks and named previous/next war navigation at both the top and bottom of each report. First and last wars have appropriately unavailable directions; bracket keys can navigate outside input controls.

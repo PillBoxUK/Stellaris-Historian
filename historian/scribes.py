@@ -193,10 +193,10 @@ def _authority_html(ruler: dict | None, empire_name: str, anchor_date: str | Non
     year = _year(anchor_date)
     return f"""
       <div class="authority">
-        <div class="authority-kicker">Set down in the Chronicle by</div>
+        <div class="authority-kicker">Chapter authority: recorded ruler</div>
         <div class="authority-name">{_e(ruler.get('name') or 'Unnamed Ruler')}</div>
         <div class="authority-role">Ruler of {_e(empire_name)}</div>
-        <div class="authority-date">Signed to the surviving record · {_e(year)}</div>
+        <div class="authority-date">Ruler observation for chapter · {_e(year)}</div>
       </div>
     """
 
@@ -280,7 +280,7 @@ def _chapter_authority_dates(
     ships = max(ship_dates) if ship_dates else latest
     combat = _combat_anchor_date(combat_snapshots) or latest
     technology = _technology_anchor_date(technology_snapshots) or latest
-    return [first, expansion, people, ships, combat, technology, latest, None]
+    return [first, expansion, people, ships, combat, technology, latest, latest, None]
 
 
 def _e(value) -> str:
@@ -417,7 +417,7 @@ def _opening_chapter(db: Database, campaign_id: int, campaign, founding, worlds,
             if civics:
                 qualities.append(f"its civic order was recorded as {civics}")
             paragraphs.append(
-                "The archive is unusually plain about what the Convocation believed itself to be: " + ", while ".join(qualities) + ". These are dry words, but they are the first surviving shape of the society that followed."
+                "The archive is unusually plain about what the empire recorded of itself: " + ", while ".join(qualities) + ". These are dry words, but they are the first surviving shape of the society that followed."
             )
     else:
         paragraphs.append(
@@ -443,7 +443,7 @@ def _opening_chapter(db: Database, campaign_id: int, campaign, founding, worlds,
             pieces.append("a construction vessel waited to turn surveyed space into possession")
         if pieces:
             paragraphs.append(
-                "Nor was the Convocation motionless. At the opening of the rolls, " + _join_words(pieces) + ". The empire's first surviving page is therefore not a still portrait, but the opening frame of movement."
+                "Nor was this empire motionless. At the opening of the rolls, " + _join_words(pieces) + ". The empire's first surviving page is therefore not a still portrait, but the opening frame of movement."
             )
 
     ruler = next((row for row in opening_leaders if row["ever_ruler"]), None)
@@ -467,48 +467,39 @@ def _opening_chapter(db: Database, campaign_id: int, campaign, founding, worlds,
 
 def _expansion_chapter(campaign, worlds) -> str:
     paragraphs: list[str] = []
-    capital = next((row for row in worlds if row["baseline_present"] and row["latest_is_capital"]), None)
+    capital = next((r for r in worlds if r["baseline_present"] and r["latest_is_capital"]), None)
     colonies = sorted(
-        [row for row in worlds if not row["baseline_present"]],
-        key=lambda row: (row["colonize_date"] or row["first_seen_date"], row["name"]),
+        [r for r in worlds if not r["baseline_present"]],
+        key=lambda r: (r["first_seen_date"] or "9999.01.01", r["name"]),
     )
-
     if capital:
         paragraphs.append(
-            f"For all the later reach of the Convocation, the record keeps returning to {capital['name']}, the {capital['planet_class_name'] or 'homeworld'} of the {capital['system_name'] or 'home'} system. By {campaign['latest_game_date']}, it was still the capital, governed by {capital['latest_governor_name'] or 'an unnamed office'} and bearing the designation {capital['latest_designation_name'] or 'capital world'}."
+            f"For all the later reach of the empire, the record keeps returning to {capital['name']}, "
+            f"in the {capital['system_name'] or 'unresolved'} system. The latest rolls describe it "
+            f"as capital, with designation {capital['latest_designation_name'] or 'not retained'}. "
+            "This latest designation is not projected into the earlier centuries."
         )
-
+    for row in colonies:
+        first = str(row['first_seen_date'] or '')
+        founded = str(row['colonize_date'] or '')
+        system = row['system_name'] or 'unresolved'
+        description = (f"By {first}, {row['name']} in the {system} system enters the imperial colony "
+                       f"record. Its retained class is {row['planet_class_name'] or 'unresolved'}. ")
+        if founded and founded <= first and founded >= str(campaign['first_game_date'] or ''):
+            description += (f"The colony register also retains a founding date of {founded}; "
+                            "that original founding does not independently establish when the empire acquired it. ")
+        description += (f"Its latest recorded designation is {row['latest_designation_name'] or 'unknown'}. "
+                        "No intervening ownership or construction is invented.")
+        paragraphs.append(description)
     if colonies:
-        for index, row in enumerate(colonies):
-            founded = row["colonize_date"] or row["first_seen_date"]
-            designation = row["latest_designation_name"] or "colony"
-            governor = row["latest_governor_name"]
-            class_name = row["planet_class_name"] or "world"
-            if index == 0:
-                text = (
-                    f"The first great outward step preserved by the archive came on {_natural_date(founded)}, when {row['name']} was founded in the {row['system_name'] or 'unresolved'} system. It was a {class_name}; in the later record it had become a {designation}."
-                )
-            else:
-                text = (
-                    f"Then came {row['name']}. The colonial rolls preserve its founding date as {_natural_date(founded)}, in the {row['system_name'] or 'unresolved'} system. The later rolls call it a {designation} on a world classified as {class_name}."
-                )
-            if governor:
-                text += f" By the end of the surviving record, {governor} was attached to its governance."
-            paragraphs.append(text)
-
         paragraphs.append(
-            f"Thus the realm visible to this archive grew from one inhabited world to {_small_number(len(worlds))}. It is a small number on a galactic map, but historical scale is not measured only in stars: each colony meant distance made routine, supply made possible, and another place from which the Convocation could imagine a future."
+            f"The surviving registry ultimately names {_small_number(len(worlds))} worlds across the "
+            "campaign, but not all are necessarily held simultaneously. First and last sightings "
+            "are evidence windows, not a complete record of every transfer or conquest."
         )
     else:
-        paragraphs.append("The surviving record contains no securely established colonial founding beyond the opening world.")
-
-    return _chapter(
-        "chapter-expansion",
-        "II",
-        "The First Reach",
-        "Worlds beyond the home system",
-        paragraphs,
-    )
+        paragraphs.append("The surviving record contains no securely established colonial expansion beyond the opening world.")
+    return _chapter("chapter-expansion", "II", "The First Reach", "Worlds beyond the home system", paragraphs)
 
 
 def _people_chapter(campaign, leaders, career_events) -> str:
@@ -540,7 +531,7 @@ def _people_chapter(campaign, leaders, career_events) -> str:
         traits = _clean_traits(ruler["trait_names"])
         trait_text = _join_words(traits[:6])
         sentence = (
-            f"At the head of the surviving record stood {ruler['name']}. The ruler is present from "
+            f"The later political rolls identify {ruler['name']} as ruler. The name appears in the archive from "
             f"{_year(ruler['first_seen_date'])} through {campaign['latest_game_date']}."
         )
         if trait_text:
@@ -662,7 +653,7 @@ def _people_chapter(campaign, leaders, career_events) -> str:
         "chapter-people",
         "III",
         "Names in the Long Record",
-        "Rulers, commanders, scientists and servants of the Convocation",
+        "Rulers, commanders, scientists and servants of the empire",
         paragraphs,
     )
 
@@ -816,7 +807,7 @@ def _combat_chapter(historical_events: list[HistoricalEvent] | tuple[HistoricalE
             detail = f"From {_natural_date(event.game_date)} through {_natural_date(end_date)}, "
         else:
             detail = f"On {_natural_date(event.game_date)}, "
-        detail += f"{_join_words(fleets[:6]) or 'Convocation forces'} entered a recorded episode of fighting"
+        detail += f"{_join_words(fleets[:6]) or 'the recorded forces'} entered a recorded episode of fighting"
         if enemies:
             detail += f" with {_join_words(enemies[:4])}"
         if systems:
@@ -843,7 +834,7 @@ def _combat_chapter(historical_events: list[HistoricalEvent] | tuple[HistoricalE
                 else:
                     detail += " The earliest complete retained tally"
                 detail += (
-                    f" recorded {initial_side} Convocation vessel{'s' if initial_side != 1 else ''} lost and "
+                    f" recorded {initial_side} imperial vessel{'s' if initial_side != 1 else ''} lost and "
                     f"{initial_opp} opposing vessel{'s' if initial_opp != 1 else ''} lost."
                 )
                 if latest_observed:
@@ -851,13 +842,13 @@ def _combat_chapter(historical_events: list[HistoricalEvent] | tuple[HistoricalE
                 else:
                     detail += " Later retained fleet records"
                 detail += (
-                    f" raised the known tally to {latest_side} Convocation vessel{'s' if latest_side != 1 else ''} lost and "
+                    f" raised the known tally to {latest_side} imperial vessel{'s' if latest_side != 1 else ''} lost and "
                     f"{latest_opp} opposing vessel{'s' if latest_opp != 1 else ''} lost. "
                     "These are changing observations of the same retained battle record, not separate casualty totals."
                 )
             elif initial_side or initial_opp:
                 detail += (
-                    f" The retained battle tallies record {initial_side} Convocation vessel{'s' if initial_side != 1 else ''} lost and "
+                    f" The retained battle tallies record {initial_side} imperial vessel{'s' if initial_side != 1 else ''} lost and "
                     f"{initial_opp} opposing vessel{'s' if initial_opp != 1 else ''} lost."
                 )
             else:
@@ -902,7 +893,7 @@ def _combat_chapter(historical_events: list[HistoricalEvent] | tuple[HistoricalE
             if enemies:
                 text += f" Opposing forces named in the surviving evidence include {_join_words(enemies[:4])}."
             if fleets:
-                text += f" Convocation formations named in these episodes include {_join_words(fleets[:5])}."
+                text += f" Imperial formations named in these episodes include {_join_words(fleets[:5])}."
             if commanders:
                 text += f" Commanders attached to those formations include {_join_words(commanders[:4])}."
             text += " The deeper ledger retains the individual combat dates and ship-level markers."
@@ -943,7 +934,7 @@ def _technology_chapter(technology_snapshots) -> str:
     if opening:
         examples = [row.name for row in opening[:10]]
         paragraphs.append(
-            f"When the surviving record opens, the Convocation already possesses {len(opening)} named technologies in its learned register. "
+            f"When the surviving record opens, the empire already possesses {len(opening)} named technologies in its learned register. "
             f"Among that inherited foundation were {_join_words(examples)}. These are not claimed as discoveries of the opening year; they are simply the knowledge with which the archive begins."
         )
 
@@ -1055,17 +1046,63 @@ def _science_chapter(db: Database, campaign_id: int) -> str:
     )
 
 
+def _politics_chapter(db: Database, campaign_id: int) -> str:
+    observations = sorted(
+        (row for row in db.politics_events(campaign_id, visible_only=True)
+         if row["game_date"] and row["title"]),
+        key=lambda r: (r["game_date"], r["title"]),
+    )
+    paragraphs = [
+        "The power of a state was not measured only in weapons. Government, internal appointments, "
+        "first contacts and relations with other polities left their own traces in the surviving rolls. "
+        "What follows is selected from published, save-derived political observations rather than "
+        "claims reconstructed from images or a presumed diplomatic history."
+    ]
+    if not observations:
+        paragraphs.append(
+            "The present chronicle contains no published, dated political observations from which "
+            "a wider account could responsibly be made. This is a gap in recovered evidence, not "
+            "a claim that the empire took no political decisions."
+        )
+    else:
+        unique = []
+        seen = set()
+        for row in observations:
+            key = (str(row["game_date"]), str(row["event_type"]), str(row["title"]))
+            if key in seen: continue
+            seen.add(key)
+            unique.append(row)
+        # Sample across the whole span, not just the most recent 6 changes.
+        indices = sorted({round(i*(len(unique)-1)/min(len(unique)-1, 9)) for i in range(min(len(unique),10))}) if len(unique)>1 else [0]
+        for index in indices:
+            event = unique[index]
+            title = str(event["title"]).strip()
+            body = str(event["body"] or "").strip()
+            body = re.sub(r"\s+", " ", body)
+            paragraphs.append(f"By {event['game_date']}, the political register records {title}. "
+                              + (f"{body[:320]} " if body else "")
+                              + "The date represents the saved evidence precision, not an invented vote or decision day.")
+    paragraphs.append(
+        "The empire's internal Council is distinct from the Galactic Community. Unless the archived "
+        "evidence independently establishes federation membership, Senate resolutions or Galactic "
+        "Council votes, the scribes make no claim to know them. The evidence-led political ledger "
+        "and Time Machine retain the fuller set of observations."
+    )
+    return _chapter("chapter-politics", "VIII", "The Chambers of Power",
+                    "Government, contacts and the wider galaxy", paragraphs)
+
+
 def _closing_chapter(campaign, worlds, leaders, ships) -> str:
     present_leaders = [row for row in leaders if row["status"] == "present"]
     present_ships = [row for row in ships if row["status"] == "present"]
     paragraphs = [
-        f"The surviving chronicle presently closes on {campaign['latest_game_date']}. By then the archive still recorded {len(worlds)} inhabited worlds under the Convocation, {len(present_ships)} mobile ships, and {len(present_leaders)} named leaders still present in the rolls.",
+        f"The surviving chronicle presently closes on {campaign['latest_game_date']}. Across its long surviving registry it identifies {len(worlds)} distinct world records; the latest status flags mark {len(present_ships)} mobile ship identities and {len(present_leaders)} named leader identities as present. The world count is cumulative and must not be mistaken for a confirmed census of simultaneous colonies.",
         "These numbers are useful, but they are not the history itself. The history lies in the distance between the first small fleet and the later navy; between one homeworld and the colonies beyond it; between the names present on the first page and those that entered service decades later; between questions first posed beneath an ageing star and mysteries still unresolved when the record ends.",
-        "Nor is this an ending. It is only the latest surviving page. The archive remains open, the calendar continues, and future scribes will inherit whatever the Convocation does next.",
+        "Nor is this an ending. It is only the latest surviving page. The archive remains open, the calendar continues, and future scribes will inherit whatever the empire does next.",
     ]
     return _chapter(
         "chapter-closing",
-        "VIII",
+        "IX",
         "The Chronicle Remains Open",
         f"The record as it stood on {campaign['latest_game_date']}",
         paragraphs,
@@ -1098,6 +1135,7 @@ def render_scribes_journal(db: Database, campaign_id: int) -> Path:
         _combat_chapter(presentation.events),
         _technology_chapter(technology_snapshots),
         _science_chapter(db, campaign_id),
+        _politics_chapter(db, campaign_id),
         _closing_chapter(campaign, worlds, leaders, ships),
     ]
     authority_dates = _chapter_authority_dates(
@@ -1162,6 +1200,7 @@ body{{
   font:600 12px Arial,sans-serif;text-decoration:none;cursor:pointer;
 }}
 .topbar .spacer{{flex:1}}
+.topbar .chapter-menu{{border-color:#aa8654;color:#f1dfc0}}
 .cover{{
   min-height:78vh;
   display:flex;align-items:center;justify-content:center;
@@ -1172,13 +1211,31 @@ body{{
   color:#f6ecd9;text-align:center;
   border-bottom:7px solid var(--gold);
 }}
-.cover-inner{{max-width:900px}}
+.cover-inner{{max-width:900px;position:relative}}
+.cover::before{{content:"";position:absolute;inset:0;pointer-events:none;opacity:.25;background-image:radial-gradient(#f6d49e .7px,transparent .9px);background-size:31px 37px}}
+.cover{{position:relative}}
 .sigil{{font-size:30px;color:#d5b06a;letter-spacing:.35em;margin-bottom:28px}}
 .kicker{{font:700 11px Arial,sans-serif;letter-spacing:.25em;text-transform:uppercase;color:#d6ba86}}
 h1{{font-size:clamp(46px,8vw,92px);line-height:.94;font-weight:500;margin:16px 0 18px}}
 .cover .dates{{font-size:19px;color:#dbcdb7}}
 .cover .motto{{max-width:680px;margin:34px auto 0;font-size:19px;line-height:1.65;font-style:italic;color:#eadcc6}}
-.book{{width:min(calc(100% - 28px),var(--width));margin:0 auto;background:var(--paper);box-shadow:0 0 40px rgba(44,31,18,.18);padding:68px clamp(28px,7vw,82px) 100px}}
+ .book{{width:min(calc(100% - 28px),var(--width));margin:0 auto;background:var(--paper);box-shadow:0 0 40px rgba(44,31,18,.18);padding:68px clamp(28px,7vw,82px) 100px}}
+.book.dark-reading{{--ink:#f0e6d6;--muted:#bcae98;--paper:#151a20;--paper-deep:#232a32;--line:#5c5241;background:#151a20}}
+.book.dark-reading .authority-name{{color:#e9c188}}
+.book.dark-reading .final-note{{background:#1e262f}}
+.contents{{border:1px solid var(--line);padding:24px 30px;background:var(--paper-deep);margin:0 0 70px}}
+.contents h2{{margin-top:0;font:normal 29px Georgia,serif}}
+.contents ol{{padding-left:24px;columns:2;column-gap:35px}}
+.contents li{{margin:0 0 15px;break-inside:avoid}}
+.contents a{{color:var(--ink);text-decoration:none;border-bottom:1px dotted var(--gold)}}
+.contents a:hover{{color:var(--gold)}}
+.reading-progress{{position:fixed;top:0;left:0;width:0;height:3px;background:#dfb979;z-index:24;pointer-events:none}}
+.chapter:target{{outline:1px solid var(--gold);outline-offset:12px}}
+.chapter h2{{position:relative}}
+.chapter h2::before{{content:"✧";color:var(--gold);position:absolute;left:-29px;font-size:20px;top:6px}}
+.in-chapter{{font:12px Arial,sans-serif;border-top:1px solid var(--line);margin-top:18px;padding-top:15px}}
+.in-chapter a{{color:var(--gold);text-decoration:none}}
+
 .preface{{padding:0 0 54px;border-bottom:1px solid var(--line);margin-bottom:68px}}
 .preface h2,.chapter h2{{font-weight:500}}
 .preface p,.prose p{{font-size:19px;line-height:1.85;margin:0 0 1.2em}}
@@ -1198,6 +1255,7 @@ h1{{font-size:clamp(46px,8vw,92px);line-height:.94;font-weight:500;margin:16px 0
 .colophon{{max-width:760px;margin:0 auto;padding-top:38px;border-top:1px solid var(--line);text-align:center;color:var(--muted);font-size:14px;line-height:1.6}}
 @media(max-width:700px){{
   .topbar{{padding:8px;flex-wrap:wrap}}
+  .contents ol{{columns:1}}
   .cover{{min-height:65vh}}
   .book{{width:100%;padding:42px 22px 70px}}
   .preface p,.prose p{{font-size:17px}}
@@ -1206,7 +1264,8 @@ h1{{font-size:clamp(46px,8vw,92px);line-height:.94;font-weight:500;margin:16px 0
 @media print{{
   @page{{size:A4 portrait;margin:18mm 17mm 20mm}}
   body{{background:white}}
-  .topbar{{display:none!important}}
+  .topbar,.reading-progress{{display:none!important}}
+  .contents ol{{columns:2}}
   .cover{{min-height:245mm;break-after:page;border:0}}
   .book{{width:auto;box-shadow:none;padding:0;background:white}}
   .preface{{break-after:page}}
@@ -1216,14 +1275,21 @@ h1{{font-size:clamp(46px,8vw,92px);line-height:.94;font-weight:500;margin:16px 0
   .authority,.final-note{{break-inside:avoid}}
 }}
 </style>
+
+<link rel="stylesheet" href="/static/historian-theme.css?v=087">
+<script src="/static/historian-theme.js?v=087"></script>
 </head>
 <body id="top">
+<div class="reading-progress" id="reading-progress"></div>
 <nav class="topbar">
   <a href="/journal">Evidence Journal</a>
   <a href="/timeline">Empire Timeline</a>
+  <a href="/time-machine">Time Machine</a>
+  <a class="chapter-menu" href="#contents">Contents</a>
   <a href="/campaign">Campaign</a>
   <div class="spacer"></div>
   <a href="/scribes/pdf" title="Generate and download a book-style PDF">Export PDF</a>
+  <button type="button" id="reading-mode" aria-pressed="false">Night reading</button>
   <button type="button" onclick="window.print()">Print</button>
 </nav>
 <section class="cover">
@@ -1239,11 +1305,31 @@ h1{{font-size:clamp(46px,8vw,92px);line-height:.94;font-weight:500;margin:16px 0
   <section class="preface">
     <h2>A Note from the Later Archive</h2>
     <p>The deeper ledger keeps every useful date, every movement, every fragment and every uncertainty because the past is rarely tidy. This chronicle has a different purpose: to gather those surviving pieces into the fullest account that can be told without giving invention the name of memory.</p>
-    <p>Where the archive knows, the scribes speak plainly. Where it only suggests, the language remains cautious. Where the evidence is silent, silence is preserved. Each completed chapter is set beneath the authority of the ruler recorded for that period and signed in that ruler's name; no speech, motive, childhood, death or triumph is supplied merely to make the tale neater.</p>
+    <p>Where the archive knows, the scribes speak plainly. Where it only suggests, the language remains cautious. Where the evidence is silent, silence is preserved. Each completed chapter identifies a ruler recorded near its subject period as a literary rubric, not a historical signature; no speech, motive, childhood, death or triumph is supplied merely to make the tale neater.</p>
+  </section>
+  <section class="contents" id="contents"><h2>In the surviving record</h2>
+    <ol>
+    <li><a href="#chapter-opening">Beneath the Old Sun</a></li>
+    <li><a href="#chapter-expansion">The First Reach</a></li>
+    <li><a href="#chapter-people">Names in the Long Record</a></li>
+    <li><a href="#chapter-ships">Ships Beneath Strange Suns</a></li>
+    <li><a href="#chapter-combat">The Years of Fire</a></li>
+    <li><a href="#chapter-technology">The Treasury of Knowledge</a></li>
+    <li><a href="#chapter-science">Questions Without Easy Answers</a></li>
+    <li><a href="#chapter-politics">The Chambers of Power</a></li>
+    <li><a href="#chapter-closing">The Chronicle Remains Open</a></li>
+    </ol>
+    <p style="font:12px Arial,sans-serif;color:var(--muted)">Each entry links to the chapter. Chapter authorities are archive annotations, not claimed signatures.</p>
   </section>
   {''.join(chapters)}
   <div class="colophon">Compiled from the surviving archives of {_e(campaign['empire_name'])}. The deeper evidence ledger preserves the fragments and uncertainties from which this chronicle was drawn.</div>
 </main>
+<script>
+(()=>{{const book=document.querySelector('.book'),button=document.querySelector('#reading-mode'),bar=document.querySelector('#reading-progress');
+button.addEventListener('click',()=>{{book.classList.toggle('dark-reading');let dark=book.classList.contains('dark-reading');button.textContent=dark?'Day reading':'Night reading';button.setAttribute('aria-pressed',String(dark));}});
+let pending=false;const showProgress=()=>{{pending=false;let h=document.documentElement;bar.style.width=(100*Math.min(1,Math.max(0,h.scrollTop/Math.max(1,h.scrollHeight-h.clientHeight))))+'%'}};
+window.addEventListener('scroll',()=>{{if(!pending){{pending=true;requestAnimationFrame(showProgress)}}}},{{passive:true}});showProgress();}})();
+</script>
 </body>
 </html>
 """
@@ -1300,6 +1386,7 @@ def render_scribes_pdf(db: Database, campaign_id: int) -> Path:
         _combat_chapter(presentation.events),
         _technology_chapter(technology_snapshots),
         _science_chapter(db, campaign_id),
+        _politics_chapter(db, campaign_id),
         _closing_chapter(campaign, worlds, leaders, ships),
     ]
     authority_dates = _chapter_authority_dates(
@@ -1330,17 +1417,18 @@ def render_scribes_pdf(db: Database, campaign_id: int) -> Path:
     gold = colors.HexColor("#9D763D")
     line = colors.HexColor("#C8AE82")
 
+    cover_ink = colors.HexColor("#F0E6D2")
     cover_kicker = ParagraphStyle(
         "CoverKicker", parent=styles["Normal"], fontName="Helvetica-Bold",
         fontSize=9, leading=12, alignment=TA_CENTER, textColor=gold, spaceAfter=9,
     )
     cover_title = ParagraphStyle(
         "CoverTitle", parent=styles["Title"], fontName="Times-Roman",
-        fontSize=31, leading=34, alignment=TA_CENTER, textColor=ink, spaceAfter=14,
+        fontSize=31, leading=36, alignment=TA_CENTER, textColor=cover_ink, spaceAfter=14,
     )
     cover_sub = ParagraphStyle(
         "CoverSub", parent=styles["Normal"], fontName="Times-Italic",
-        fontSize=11, leading=16, alignment=TA_CENTER, textColor=muted,
+        fontSize=11, leading=16, alignment=TA_CENTER, textColor=cover_ink,
     )
     chapter_no = ParagraphStyle(
         "ChapterNo", parent=styles["Normal"], fontName="Helvetica-Bold",
@@ -1372,13 +1460,15 @@ def render_scribes_pdf(db: Database, campaign_id: int) -> Path:
     )
     final_style = ParagraphStyle(
         "Final", parent=styles["Normal"], fontName="Times-Italic",
-        fontSize=11, leading=16, alignment=TA_CENTER, textColor=muted,
+        fontSize=11, leading=16, alignment=TA_CENTER, textColor=cover_ink,
     )
 
     story = []
     story.extend([
         Spacer(1, 38 * mm),
-        Paragraph("AS THE SCRIBES SAW IT", cover_kicker),
+        Paragraph("THE RECORD OF A GALACTIC CIVILISATION", cover_kicker),
+        Spacer(1, 8 * mm),
+        Paragraph("✦  AS THE SCRIBES SAW IT  ✦", cover_kicker),
         Paragraph(xml_escape(f"The Chronicle of {campaign['empire_name']}"), cover_title),
         HRFlowable(width="62%", thickness=0.8, color=gold, spaceBefore=5, spaceAfter=12, hAlign="CENTER"),
         Paragraph(
@@ -1395,6 +1485,11 @@ def render_scribes_pdf(db: Database, campaign_id: int) -> Path:
             cover_sub,
         ),
         PageBreak(),
+        Paragraph("In the surviving record", chapter_title),
+        Paragraph("I. Beneath the Old Sun  ·  II. The First Reach  ·  III. Names in the Long Record", body),
+        Paragraph("IV. Ships Beneath Strange Suns  ·  V. The Years of Fire  ·  VI. The Treasury of Knowledge", body),
+        Paragraph("VII. Questions Without Easy Answers  ·  VIII. The Chambers of Power  ·  IX. The Chronicle Remains Open", body),
+        Spacer(1, 10 * mm),
         Paragraph("A Note from the Later Archive", chapter_title),
         Paragraph(
             "The deeper ledger keeps every useful date, every movement, every fragment and every uncertainty because the past is rarely tidy. "
@@ -1404,13 +1499,13 @@ def render_scribes_pdf(db: Database, campaign_id: int) -> Path:
         Paragraph(
             "Where the archive knows, the scribes speak plainly. Where it only suggests, the language remains cautious. "
             "Where the evidence is silent, silence is preserved. Each completed chapter is set beneath the authority of "
-            "the ruler recorded for that period and signed in that ruler's name; no speech, motive, childhood, death or triumph "
+            "a ruler observed near that period, not a literal historical signatory; no speech, motive, childhood, death or triumph "
             "is supplied merely to make the tale neater.",
             body,
         ),
     ])
 
-    roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"]
+    roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"]
     for index, (chapter_html, anchor_date) in enumerate(zip(raw_chapters, authority_dates)):
         title, subtitle, paragraphs = _chapter_parts(chapter_html)
         story.append(PageBreak())
@@ -1442,10 +1537,10 @@ def render_scribes_pdf(db: Database, campaign_id: int) -> Path:
         ruler = _ruler_for_date(ruler_observations, anchor_date)
         if ruler:
             data = [
-                [Paragraph("SET DOWN IN THE CHRONICLE BY", authority_kicker)],
+                [Paragraph("CHAPTER AUTHORITY: RECORDED RULER", authority_kicker)],
                 [Paragraph(xml_escape(str(ruler.get("name") or "Unnamed Ruler")), authority_name)],
                 [Paragraph(xml_escape(f"Ruler of {campaign['empire_name']}"), authority_role)],
-                [Paragraph(xml_escape(f"Signed to the surviving record - {_year(anchor_date)}"), authority_role)],
+                [Paragraph(xml_escape(f"Ruler observation for chapter - {_year(anchor_date)}"), authority_role)],
             ]
             table = Table(data, colWidths=[78 * mm], hAlign="RIGHT")
             table.setStyle(TableStyle([
@@ -1456,6 +1551,34 @@ def render_scribes_pdf(db: Database, campaign_id: int) -> Path:
                 ("RIGHTPADDING", (0, 0), (-1, -1), 0),
             ]))
             story.extend([Spacer(1, 7 * mm), table])
+
+    def cover_page(canvas, doc_obj):
+        # A deterministic, vector-drawn galactic atlas motif: no screenshots or
+        # game art and no need to install additional assets or fonts.
+        canvas.saveState()
+        canvas.setFillColor(colors.HexColor("#0B1524"))
+        canvas.rect(0, 0, page_w, _page_h, fill=1, stroke=0)
+        canvas.setStrokeColor(colors.HexColor("#445976"))
+        canvas.setLineWidth(0.65)
+        cx,cy=page_w/2, _page_h*.68
+        for radius in (34*mm, 51*mm, 70*mm):
+            canvas.circle(cx,cy,radius,fill=0,stroke=1)
+        canvas.setStrokeColor(colors.HexColor("#AD8655"))
+        canvas.circle(cx,cy,15*mm,fill=0,stroke=1)
+        canvas.line(cx-89*mm,cy,cx+89*mm,cy)
+        canvas.line(cx,cy-85*mm,cx,cy+85*mm)
+        for i in range(110):
+            # Stable positions, not random data and not maps of recorded systems.
+            x=10*mm + ((i*73+31)%480)/480*(page_w-20*mm)
+            y=20*mm + ((i*173+47)%730)/730*(_page_h-40*mm)
+            canvas.setFillColor(colors.HexColor("#C1B99E" if i%7==0 else "#667890"))
+            canvas.circle(x,y,(1.0 if i%9==0 else .45),stroke=0,fill=1)
+        canvas.setStrokeColor(colors.HexColor("#B6955E"))
+        canvas.line(18*mm,18*mm,page_w-18*mm,18*mm)
+        canvas.setFont("Helvetica",7)
+        canvas.setFillColor(colors.HexColor("#C8B899"))
+        canvas.drawCentredString(page_w/2,14*mm,"A CHRONICLE OF SURVIVING EVIDENCE — NOT A WORK OF FICTION")
+        canvas.restoreState()
 
     def footer(canvas, _doc_obj):
         page = canvas.getPageNumber()
@@ -1471,6 +1594,6 @@ def render_scribes_pdf(db: Database, campaign_id: int) -> Path:
         canvas.drawRightString(page_w - 19 * mm, 7.5 * mm, str(page))
         canvas.restoreState()
 
-    doc.build(story, onFirstPage=footer, onLaterPages=footer)
+    doc.build(story, onFirstPage=cover_page, onLaterPages=footer)
     os.replace(temp, target)
     return target

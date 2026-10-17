@@ -12,12 +12,11 @@ const selectCampaignButton = document.getElementById("select-new-campaign");
 const updateButton = document.getElementById("update-history");
 const liveHistoryButton = document.getElementById("live-history");
 const reviewButton = document.getElementById("review-campaign");
+const rewriteTimelineButton = document.getElementById("rewrite-timeline");
 const constructButton = document.getElementById("construct-campaign");
 const constructModal = document.getElementById("construct-modal");
 const constructCancel = document.getElementById("construct-cancel");
 const constructConfirm = document.getElementById("construct-confirm");
-const viewJournalButton = document.getElementById("view-journal");
-const viewWarJournalButton = document.getElementById("view-war-journal");
 const openCampaignFolderButton = document.getElementById("open-campaign-folder");
 const openDiagnosticsFolderButton = document.getElementById("open-diagnostics-folder");
 const closeButton = document.getElementById("close-app");
@@ -51,19 +50,12 @@ function applyActionAvailability(data = latestCampaignState){
   reviewButton.disabled =
     actionInProgress || liveBlocking || unprocessed > 0 || archived === 0;
 
+  rewriteTimelineButton.disabled = actionInProgress || liveBlocking || unprocessed > 0 || archived === 0;
   constructButton.disabled =
     actionInProgress || liveBlocking || archived === 0;
 
-  viewWarJournalButton.disabled =
-    actionInProgress || liveBusy || archived === 0 || unprocessed > 0;
-
-  viewWarJournalButton.title = liveBusy
-    ? "Wait for the current Live History update to finish before opening the War Journal."
-    : (unprocessed > 0
-      ? "Run Update History first so the War Journal uses fully processed evidence."
-      : (archived > 0
-        ? "Open the evidence-led War Journal for this campaign."
-        : "No archived saves are available for the War Journal."));
+  // Reading the existing archive stays accessible while fresh saves finish.
+  document.getElementById("historian-library").hidden = archived === 0;
 
   updateButton.title = liveBlocking
     ? "Live History is ON or finishing an automatic history update."
@@ -135,7 +127,6 @@ async function loadActive(){
     processedCount.textContent = data.processed_count ?? 0;
     monitorStatus.textContent = data.watcher_status || "Monitoring";
 
-    viewJournalButton.disabled = !data.journal_exists;
     applyActionAvailability(data);
 
     const snapshots = data.snapshots || [];
@@ -236,7 +227,6 @@ updateButton.addEventListener("click", async () => {
         ` Errors: ${data.errors.join(" | ")}`;
     }
 
-    viewJournalButton.disabled = false;
 
     await loadActive();
 
@@ -280,8 +270,7 @@ reviewButton.addEventListener("click", async () => {
     }
 
     if(data.ok){
-      viewJournalButton.disabled = false;
-    }
+      }
 
     await loadActive();
 
@@ -332,7 +321,6 @@ constructConfirm.addEventListener("click", async () => {
 
   actionInProgress = true;
   applyActionAvailability();
-  viewJournalButton.disabled = true;
 
   constructButton.textContent = "Constructing...";
   status.textContent =
@@ -360,8 +348,7 @@ constructConfirm.addEventListener("click", async () => {
     }
 
     if(data.ok){
-      viewJournalButton.disabled = false;
-    }
+      }
 
     await loadActive();
 
@@ -374,22 +361,6 @@ constructConfirm.addEventListener("click", async () => {
     constructButton.textContent = "Construct Campaign";
     applyActionAvailability();
   }
-});
-
-viewWarJournalButton.addEventListener("click", () => {
-  window.open(
-    "/war-journal",
-    "_blank",
-    "noopener"
-  );
-});
-
-viewJournalButton.addEventListener("click", () => {
-  window.open(
-    "/journal",
-    "_blank",
-    "noopener"
-  );
 });
 
 async function openFolder(endpoint, label){
@@ -417,20 +388,52 @@ openDiagnosticsFolderButton.addEventListener("click", () => {
   openFolder("/api/open-diagnostics-folder", "diagnostics folder");
 });
 
-closeButton.addEventListener("click", async () => {
-  closeButton.disabled = true;
-  closeButton.textContent = "Closing...";
-
-  try{
-    await fetch(
-      "/app/close",
-      {method:"POST"}
-    );
-  }catch{}
-
-  status.textContent =
-    "Historian closed. You can close this browser tab.";
-});
+closeButton.addEventListener("click", () => window.HistorianClose(closeButton, status));
 
 loadActive();
 setInterval(loadActive, 2000);
+
+// Full historical reconstruction runs in the background after a SQLite backup.
+rewriteTimelineButton.addEventListener('click', async () => {
+  if (actionInProgress) return;
+  if (!confirm('Rebuild the complete historical timeline from every archived save? The canonical database is backed up first; current evidence parsers will re-derive the historical registers. This can take several minutes. Keep Live History OFF.')) return;
+  actionInProgress = true;
+  rewriteTimelineButton.textContent = 'Rebuilding History…';
+  applyActionAvailability();
+  try {
+    const start = await fetch('/api/rewrite-timeline', {method:'POST'});
+    const first = await start.json();
+    if (!start.ok) throw new Error(first.detail || 'Could not start the rewrite.');
+    let complete = false;
+    while (!complete) {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const req = await fetch('/api/rewrite-timeline/status', {cache:'no-store'});
+      const item = await req.json();
+      status.textContent = `${item.message} ${item.total ? `(${item.progress}/${item.total})` : ''}`;
+      if (!item.running) {
+        complete = true;
+        if (item.error) throw new Error(item.error);
+        status.textContent = `${item.message} ${item.result?.archived_saves_inspected ?? 0} archived saves checked. Open Empire Timeline to read it.`;
+      }
+    }
+  } catch (err) {
+    status.textContent = `Timeline rewrite: ${err.message}`;
+  } finally {
+    actionInProgress = false;
+    rewriteTimelineButton.textContent = 'Update Historical Timeline';
+    applyActionAvailability();
+  }
+});
+
+document.getElementById('save-stellaris-game-folder').addEventListener('click', async ()=> {
+  const field=document.getElementById('stellaris-game-folder');
+  const button=document.getElementById('save-stellaris-game-folder');
+  button.disabled=true;
+  try{
+    const req=await fetch('/api/stellaris-game-folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder:field.value})});
+    const data=await req.json();
+    if(!req.ok) throw new Error(data.detail || 'Could not load game texts');
+    status.textContent=`Game text catalogue ready: ${data.catalogue.localisation_keys} entries. Run Rewrite Timeline to incorporate story descriptions.`;
+  }catch(err){status.textContent=`Game texts: ${err.message}`;}
+  finally{button.disabled=false;}
+});

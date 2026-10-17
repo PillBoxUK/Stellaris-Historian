@@ -1186,6 +1186,9 @@ th{{
   :focus-visible {{ outline:2px solid #9ccfff; outline-offset:2px; }}
 }}
 </style>
+
+<link rel="stylesheet" href="/static/historian-theme.css?v=087">
+<script src="/static/historian-theme.js?v=087"></script>
 </head>
 
 <body id="top">

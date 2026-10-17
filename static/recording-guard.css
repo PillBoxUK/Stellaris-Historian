@@ -1,0 +1,28 @@
+/* Recording state is explicitly written in words: never colour alone. */
+.recording-status-banner[hidden],.recording-guard-backdrop[hidden]{display:none!important}
+.recording-status-banner{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding:15px max(22px,calc((100vw - 1120px)/2));border-bottom:2px solid #9d742f;background:#1d2630;color:#f7e7d2;font-family:system-ui,sans-serif;font-size:14px;line-height:1.45;box-sizing:border-box}
+.recording-status-banner strong{font-size:15px;letter-spacing:.02em;white-space:normal}
+.recording-status-banner span{flex:1;min-width:220px}
+.recording-status-banner[data-state="off"],.recording-status-banner[data-state="pending"],.recording-status-banner[data-state="error"]{background:#381d20;border-color:#e5a04d;color:#fff4e1}
+.recording-status-banner[data-state="on"]{background:#1c3832;border-color:#68b3a6}
+.recording-status-banner button{background:#e8b972;color:#171b20;border:2px solid #ffe0a4;border-radius:5px;padding:9px 13px;cursor:pointer;font-weight:750}
+.recording-status-banner button:hover,.recording-status-banner button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.recording-guard-backdrop{position:fixed;inset:0;background:rgba(3,7,12,.91);z-index:2147483000;display:grid;place-items:center;padding:20px;overflow-y:auto;box-sizing:border-box}
+body.recording-dialog-open{overflow:hidden}
+.recording-guard-panel{width:min(92vw,760px);max-height:calc(100vh - 42px);overflow-y:auto;box-sizing:border-box;border:3px solid #d5aa64;border-radius:13px;background:linear-gradient(155deg,#152632,#0c151c 65%);box-shadow:0 35px 120px #000;color:#f3e9d6;text-align:center;padding:32px 35px;font-family:system-ui,sans-serif;line-height:1.55}
+.recording-guard-panel h2{margin:7px 0 18px;font-size:clamp(25px,3vw,38px);color:#fff4de;line-height:1.2}
+.recording-guard-eyebrow{font-size:12px;text-transform:uppercase;font-weight:850;letter-spacing:.16em;color:#eac389}
+.recording-guard-symbol{color:#f5c27e;font-size:46px;margin:12px 0 0}
+.recording-guard-panel p{margin:13px 0;font-size:15px}
+.recording-guard-civilisation{background:#192f35;padding:10px;border-radius:5px;font-weight:750;color:#f3cf95}
+.recording-guard-caution{border:1px solid #a77c4f;text-align:left;padding:15px;background:#30252a;border-radius:8px}
+.recording-guard-actions{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:26px}
+.recording-guard-actions button{min-height:72px;border-radius:8px;border:2px solid transparent;padding:15px 17px;cursor:pointer;font:800 16px/1.25 system-ui,sans-serif}
+.recording-guard-yes{background:#237d67;border-color:#8ce4bd!important;color:#fff}
+.recording-guard-no{background:#3c2025;border-color:#e3ae70!important;color:#fff1e2}
+.recording-guard-actions button:hover,.recording-guard-actions button:focus-visible{outline:3px solid #fff;outline-offset:3px;filter:brightness(1.12)}
+.recording-guard-actions button:disabled{opacity:.55;cursor:wait}
+.recording-guard-footnote{font-size:13px!important;color:#bfd4dd}
+.recording-guard-error{border:2px solid #e8b16d;background:#491e22;color:#fff;padding:11px;text-align:left;border-radius:5px}
+@media(max-width:630px){.recording-guard-panel{width:100%;padding:21px 16px}.recording-guard-actions{grid-template-columns:1fr;gap:10px}.recording-guard-actions button{min-height:58px}.recording-status-banner{padding:12px 18px}}
+@media(prefers-reduced-motion:reduce){.recording-status-banner button,.recording-guard-actions button{transition:none}}

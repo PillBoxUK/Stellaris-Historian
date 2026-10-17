@@ -37,10 +37,10 @@ from .domains.technology.cache import snapshot_from_dict as technology_snapshot_
 class PresentationHistory:
     """Shared evidence bundle consumed by polished presentation views.
 
-    Review Campaign remains the deepest evidence-building step. Timeline,
-    Scribes and the War Journal read only the database plus already-populated
-    cache components for snapshots that completed normal History processing.
-    None of these renderers reparses Ironman saves or mutates campaign evidence.
+    Review Campaign remains the evidence-building step. Timeline and Scribes read
+    only the database plus already-populated snapshot-cache components and then
+    synthesize the same Historical Event Layer in memory. Neither renderer
+    reparses Ironman saves or mutates campaign evidence.
     """
 
     events: tuple[HistoricalEvent, ...]
@@ -82,7 +82,7 @@ def _cached_component_snapshots(
         return []
 
     result: list = []
-    for snapshot in db.processed_snapshots(campaign_id):
+    for snapshot in db.all_snapshots(campaign_id):
         path = cache_dir / f"{snapshot['sha256']}.json"
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -114,34 +114,36 @@ def build_presentation_history(db: Database, campaign_id: int) -> PresentationHi
     if campaign is None:
         raise ValueError("Campaign does not exist.")
 
-    ship_snapshots = _cached_component_snapshots(
-        db,
-        campaign_id,
-        component_name=SHIP_COMPONENT_NAME,
-        component_version=SHIP_COMPONENT_VERSION,
-        loader=ship_snapshot_from_dict,
+    # All historical pages used to read and JSON-decode EVERY per-save cache
+    # four separate times. Decode it once and fan its versioned components out
+    # to the domain snapshot loaders. No raw .sav reads and no DB writes.
+    cache_dir = _local_archive_dir(db, campaign) / ".historian_cache"
+    bundles = (
+        (SHIP_COMPONENT_NAME, SHIP_COMPONENT_VERSION, ship_snapshot_from_dict),
+        (COMBAT_COMPONENT_NAME, COMBAT_COMPONENT_VERSION, combat_snapshot_from_dict),
+        (SCIENCE_COMPONENT_NAME, SCIENCE_COMPONENT_VERSION, science_snapshot_from_dict),
+        (TECHNOLOGY_COMPONENT_NAME, TECHNOLOGY_COMPONENT_VERSION, technology_snapshot_from_dict),
     )
-    combat_snapshots = _cached_component_snapshots(
-        db,
-        campaign_id,
-        component_name=COMBAT_COMPONENT_NAME,
-        component_version=COMBAT_COMPONENT_VERSION,
-        loader=combat_snapshot_from_dict,
-    )
-    science_snapshots = _cached_component_snapshots(
-        db,
-        campaign_id,
-        component_name=SCIENCE_COMPONENT_NAME,
-        component_version=SCIENCE_COMPONENT_VERSION,
-        loader=science_snapshot_from_dict,
-    )
-    technology_snapshots = _cached_component_snapshots(
-        db,
-        campaign_id,
-        component_name=TECHNOLOGY_COMPONENT_NAME,
-        component_version=TECHNOLOGY_COMPONENT_VERSION,
-        loader=technology_snapshot_from_dict,
-    )
+    collected = [[] for _ in bundles]
+    if cache_dir.is_dir():
+        for snapshot in db.all_snapshots(campaign_id):
+            try:
+                payload = json.loads((cache_dir / (str(snapshot["sha256"]) + ".json")).read_text("utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            components = payload.get("components", {})
+            for idx, (name, version, loader) in enumerate(bundles):
+                item = components.get(name, {})
+                if not isinstance(item, dict) or item.get("version") != version:
+                    continue
+                data = item.get("data")
+                if not isinstance(data, dict):
+                    continue
+                try:
+                    collected[idx].append(loader(data, snapshot_id=int(snapshot["id"])))
+                except (KeyError, TypeError, ValueError):
+                    continue
+    ship_snapshots, combat_snapshots, science_snapshots, technology_snapshots = collected
 
     correlated_engagements = derive_correlated_engagements(
         ship_snapshots,

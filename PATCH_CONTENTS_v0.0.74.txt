@@ -1,0 +1,52 @@
+STELLARIS HISTORIAN v0.0.74 — GALACTIC OBSERVATORY
+====================================================
+
+CONTENTS: A flat-root source-code-only classic patch.
+No wrapper directory, payload installer or changes to your existing archives.
+
+PATCH HIGHLIGHTS
+- Empire Time Machine with actual processed archive dates and saved-state politics.
+- Reviewed event chronology including warfare, contacts and technology.
+- Time-scrubbing, playback, chronological evidence, topic and search filtering, date dossiers.
+- Scribes book: redesigned cosmic HTML, linked contents, night/day modes, reading progress.
+- Scribes 9th chapter: documented political history, internal council kept separate.
+- Redesigned PDF cover and front-of-book contents.
+- Conservative colonisation/acquisition and leader-authority narrative corrections.
+- Historical Observatory campaign navigation for six local viewing experiences.
+- New regression tests; no parser, save watcher, SQLite schema or migrations modified.
+
+INSTALL (EXISTING CLASSIC PROCESS)
+1. Turn Live History OFF and wait for processing to stop; close Historian.
+2. Back up any pre-existing app files named in SHA256SUMS_v0.0.74.txt.
+3. Copy these extracted files and folders to G:\codex\StellarisHistorian,
+   preserving the structure and overwriting files with matching names.
+4. Start with the original G:\codex\StellarisHistorian\start.bat.
+5. Check version 0.0.74 on the dashboard and open Historical Observatory.
+
+No reset/rebuild/review of campaign history is needed. A restart IS required.
+Nothing is committed or pushed to GitHub by this package.
+
+PROTECTED / EXCLUDED
+No data, *.sav, *.db, *.sqlite, *.sqlite3, logs, private config,
+autobackups, forensic caches, .venv, or user-owned files in the ZIP.
+
+TESTED: Python compilation, v66–v74 regression tests, Chromium interactions,
+HTML escaping, political-state date provenance, and isolated PDF generation.
+Full real-world Commonwealth data remains to be checked on the user's PC.
+
+FILES
+README.md
+app.py
+docs/CHANGELOG.md
+documentation/release_notes/README_v0.0.74.md
+historian/__init__.py
+historian/time_machine.py
+historian/scribes.py
+historian/interactive_timeline.py
+historian/empire_archive.py
+historian_manifest.json
+start.bat
+static/campaign.html
+static/campaign.js
+static/style.css
+test_v0_0_74.py

@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 import hashlib
+import sqlite3
 import os
 import re
 import subprocess
@@ -12,7 +13,7 @@ import time
 import webbrowser
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
@@ -29,7 +30,20 @@ from historian.history_processor import (
 from historian.journal import journal_path, render_journal
 from historian.scribes import render_scribes_journal, render_scribes_pdf
 from historian.timeline import render_timeline
+from historian.timeline_rewrite import rewrite_timeline
+from historian.research_history import render_research_history
+from historian.civic_frontier import render_civic_frontier_history
+from historian.government_people import render_government_people
+from historian.annual_census import render_annual_census
+from historian.imperial_dashboard import dashboard_data
+from historian.local_database_browser import (
+    databases as discover_local_databases, available_tables, table_rows,
+    schema as read_database_schema, select_query, csv_export,
+)
+from historian.story_text import set_game_installation, catalogue_status
+from historian.time_machine import render_time_machine
 from historian.war_journal import render_war_journal
+from historian.empire_archive import render_empire_archive
 from historian.localisation import write_origin_localisation_debug
 from historian.save_reader import read_campaign_summary, read_empire_profile, valid_stellaris_save
 from historian.watcher import CampaignWatcher
@@ -61,8 +75,31 @@ server: uvicorn.Server | None = None
 LIVE_HISTORY_ENABLED = False
 LIVE_HISTORY_BUSY = False
 LIVE_HISTORY_STATUS = "OFF"
+# Explicit permission is requested after each civilisation selection.
+RECORDING_DECISION = "none"  # none | pending | accepted | declined
 LIVE_HISTORY_STOP = threading.Event()
 LIVE_HISTORY_THREAD: threading.Thread | None = None
+TIMELINE_REWRITE_LOCK = threading.Lock()
+TIMELINE_REWRITE_STATE: dict = {'running': False, 'progress': 0, 'total': 0, 'message': 'Not started', 'result': None, 'error': None}
+
+
+def _timeline_rewrite_worker(campaign_id: int) -> None:
+    def progress(i: int,total: int,message: str):
+        with TIMELINE_REWRITE_LOCK:
+            TIMELINE_REWRITE_STATE.update(progress=i,total=total,message=message)
+    try:
+        output = rewrite_timeline(DB,campaign_id,progress=progress)
+        with TIMELINE_REWRITE_LOCK:
+            TIMELINE_REWRITE_STATE.update(running=False,result=output,error=None,message=(
+                f'Timeline rewritten; {len(output.get("research_ledger_failed", []))} research save(s) could not be indexed. See report.'
+                if output.get('research_ledger_failed') else 'Every archived save reviewed, historical evidence rebuilt, and the Imperial Annals updated.'))
+        activity(f'TIMELINE REWRITE completed; {output["archived_saves_inspected"]} save archives inspected.')
+    except Exception as exc:
+        with TIMELINE_REWRITE_LOCK:
+            TIMELINE_REWRITE_STATE.update(running=False,error=str(exc),message=f'Timeline rewrite failed: {exc}')
+        error(f'TIMELINE REWRITE failed: {exc}')
+
+
 
 
 def _refresh_event_character_probe(campaign_id: int):
@@ -529,7 +566,7 @@ def api_recent_campaigns(limit: int = Query(default=5)):
 
 @app.post("/api/start-campaign")
 async def api_start_campaign(request: Request):
-    global ACTIVE_CAMPAIGN_ID, LIVE_HISTORY_ENABLED, LIVE_HISTORY_STATUS
+    global ACTIVE_CAMPAIGN_ID, LIVE_HISTORY_ENABLED, LIVE_HISTORY_STATUS, RECORDING_DECISION
 
     if LIVE_HISTORY_BUSY:
         raise HTTPException(
@@ -568,7 +605,8 @@ async def api_start_campaign(request: Request):
     campaign = get_or_create_campaign(selected)
     ACTIVE_CAMPAIGN_ID = int(campaign["id"])
     LIVE_HISTORY_ENABLED = False
-    LIVE_HISTORY_STATUS = "OFF"
+    LIVE_HISTORY_STATUS = "OFF - awaiting recording decision"
+    RECORDING_DECISION = "pending"
 
     WATCHER.select_campaign(
         selected,
@@ -584,7 +622,7 @@ async def api_start_campaign(request: Request):
 
 @app.post("/api/select-new-campaign")
 def api_select_new_campaign():
-    global ACTIVE_CAMPAIGN_ID, LIVE_HISTORY_ENABLED, LIVE_HISTORY_STATUS
+    global ACTIVE_CAMPAIGN_ID, LIVE_HISTORY_ENABLED, LIVE_HISTORY_STATUS, RECORDING_DECISION
 
     if LIVE_HISTORY_BUSY:
         raise HTTPException(
@@ -595,6 +633,7 @@ def api_select_new_campaign():
     previous_campaign = DB.campaign(ACTIVE_CAMPAIGN_ID) if ACTIVE_CAMPAIGN_ID is not None else None
     LIVE_HISTORY_ENABLED = False
     LIVE_HISTORY_STATUS = "OFF"
+    RECORDING_DECISION = "none"
     WATCHER.clear_campaign()
     ACTIVE_CAMPAIGN_ID = None
 
@@ -614,6 +653,8 @@ def api_active_campaign():
             "live_history_enabled": False,
             "live_history_busy": False,
             "live_history_status": "OFF",
+            "recording_decision": "none",
+            "recording_confirmation_required": False,
         }
 
     campaign = DB.campaign(ACTIVE_CAMPAIGN_ID)
@@ -626,6 +667,8 @@ def api_active_campaign():
             "live_history_enabled": False,
             "live_history_busy": False,
             "live_history_status": "OFF",
+            "recording_decision": "none",
+            "recording_confirmation_required": False,
         }
 
     snapshots = [
@@ -649,6 +692,8 @@ def api_active_campaign():
         "live_history_enabled": LIVE_HISTORY_ENABLED,
         "live_history_busy": LIVE_HISTORY_BUSY,
         "live_history_status": LIVE_HISTORY_STATUS,
+        "recording_decision": RECORDING_DECISION,
+        "recording_confirmation_required": RECORDING_DECISION == "pending",
         "archive_count": DB.snapshot_count(ACTIVE_CAMPAIGN_ID),
         "unprocessed_count": DB.unprocessed_count(ACTIVE_CAMPAIGN_ID),
         "processed_count": DB.processed_count(ACTIVE_CAMPAIGN_ID),
@@ -766,7 +811,7 @@ def api_update_history():
 
 @app.post("/api/live-history")
 async def api_live_history(request: Request):
-    global LIVE_HISTORY_ENABLED, LIVE_HISTORY_STATUS
+    global LIVE_HISTORY_ENABLED, LIVE_HISTORY_STATUS, RECORDING_DECISION
 
     if ACTIVE_CAMPAIGN_ID is None:
         raise HTTPException(400, "No campaign is active.")
@@ -777,6 +822,7 @@ async def api_live_history(request: Request):
         raise HTTPException(400, "enabled must be true or false.")
 
     LIVE_HISTORY_ENABLED = enabled
+    RECORDING_DECISION = "accepted" if enabled else "declined"
     LIVE_HISTORY_STATUS = (
         "ON - checking archived saves"
         if enabled
@@ -794,6 +840,52 @@ async def api_live_history(request: Request):
         "enabled": LIVE_HISTORY_ENABLED,
         "busy": LIVE_HISTORY_BUSY,
         "status": LIVE_HISTORY_STATUS,
+    }
+
+
+@app.post("/api/recording-decision")
+async def api_recording_decision(request: Request):
+    """Record explicit permission for the selected civilisation's Live History.
+
+    This only controls background history processing. The source Ironman save,
+    archived saves, parsed historical database and game files are never altered.
+    """
+    global RECORDING_DECISION, LIVE_HISTORY_ENABLED, LIVE_HISTORY_STATUS
+
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, "No civilisation is selected.")
+    payload = await request.json()
+    if not isinstance(payload, dict) or not isinstance(payload.get("enabled"), bool):
+        raise HTTPException(400, "enabled must be true or false.")
+    try:
+        selected_id = int(payload.get("campaign_id"))
+    except (ValueError, TypeError):
+        raise HTTPException(400, "A valid selected campaign_id is required.")
+    if selected_id != ACTIVE_CAMPAIGN_ID:
+        raise HTTPException(409, "The selected civilisation changed. Reload and confirm again.")
+    if DB.campaign(ACTIVE_CAMPAIGN_ID) is None:
+        raise HTTPException(409, "The selected civilisation is unavailable.")
+
+    enabled = payload["enabled"]
+    LIVE_HISTORY_ENABLED = enabled
+    RECORDING_DECISION = "accepted" if enabled else "declined"
+    LIVE_HISTORY_STATUS = (
+        "ON - checking archived saves" if enabled else
+        "OFF requested - finishing current history update" if LIVE_HISTORY_BUSY else "OFF"
+    )
+    activity(
+        f"RECORDING CONFIRMATION - {'YES, Live History ON' if enabled else 'NO, Live History OFF'} "
+        f"for campaign {ACTIVE_CAMPAIGN_ID}"
+    )
+    return {
+        "ok": True,
+        "campaign_id": ACTIVE_CAMPAIGN_ID,
+        "enabled": LIVE_HISTORY_ENABLED,
+        "busy": LIVE_HISTORY_BUSY,
+        "recording_decision": RECORDING_DECISION,
+        "status": LIVE_HISTORY_STATUS,
+        "watcher_status": WATCHER.status,
+        "queued_saves": DB.unprocessed_count(ACTIVE_CAMPAIGN_ID),
     }
 
 
@@ -1295,6 +1387,25 @@ def open_war_journal():
     )
 
 
+@app.get("/empire-archive")
+def open_empire_archive():
+    """Read-only non-war historical archive from already-processed SQLite evidence."""
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, "No campaign is active.")
+    if DB.unprocessed_count(ACTIVE_CAMPAIGN_ID):
+        raise HTTPException(409, "History is still processing; wait until the archive is caught up.")
+    try:
+        path = render_empire_archive(DB, ACTIVE_CAMPAIGN_ID)
+    except Exception as exc:
+        error(f"EMPIRE ARCHIVE - {exc}")
+        raise HTTPException(500, f"Empire Archive could not be rendered: {exc}") from exc
+    return FileResponse(
+        path,
+        media_type="text/html",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+
 @app.get("/scribes")
 def open_scribes():
     if ACTIVE_CAMPAIGN_ID is None:
@@ -1345,6 +1456,245 @@ def export_scribes_pdf():
         filename=f"{safe_name(campaign['empire_name'])} - Scribes Chronicle.pdf",
         headers={"Cache-Control": "no-store, max-age=0"},
     )
+
+
+@app.get("/time-machine")
+def open_time_machine():
+    """Read-only archived-date browser; no save parsing or SQLite mutations."""
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, "No campaign is active.")
+    if DB.unprocessed_count(ACTIVE_CAMPAIGN_ID):
+        raise HTTPException(409, "Wait for historical processing to finish.")
+    try:
+        path = render_time_machine(DB, ACTIVE_CAMPAIGN_ID)
+    except Exception as exc:
+        error(f"TIME MACHINE - {exc}")
+        raise HTTPException(500, f"Time Machine could not be rendered: {exc}") from exc
+    return FileResponse(path, media_type="text/html", headers={"Cache-Control": "no-store, max-age=0"})
+
+
+@app.get("/interactive-timeline")
+def open_interactive_timeline():
+    """Retired timeline links now lead to the canonical vertical chronology."""
+    return RedirectResponse(url="/timeline", status_code=307)
+
+
+
+@app.post('/api/stellaris-game-folder')
+async def api_set_stellaris_game_folder(request: Request):
+    if TIMELINE_REWRITE_STATE['running']:
+        raise HTTPException(409, 'Wait for the timeline rewrite to finish.')
+    data=await request.json()
+    try:
+        folder=set_game_installation(str(data.get('folder') or ''))
+    except (ValueError,OSError) as exc:
+        raise HTTPException(400,str(exc)) from exc
+    return {'ok':True,'folder':folder,'catalogue':catalogue_status()}
+
+
+@app.post('/api/rewrite-timeline')
+def api_rewrite_timeline():
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400,'Select a campaign first.')
+    if LIVE_HISTORY_ENABLED or LIVE_HISTORY_BUSY:
+        raise HTTPException(409,'Turn Live History OFF and wait for it to finish before rewriting.')
+    if DB.unprocessed_count(ACTIVE_CAMPAIGN_ID):
+        raise HTTPException(409,'Process pending archives before rewriting the timeline.')
+    with TIMELINE_REWRITE_LOCK:
+        if TIMELINE_REWRITE_STATE['running']:
+            raise HTTPException(409,'A rewrite is already running.')
+        TIMELINE_REWRITE_STATE.update(running=True,progress=0,total=DB.snapshot_count(ACTIVE_CAMPAIGN_ID),
+            message='Starting chronological archive audit…',result=None,error=None)
+    threading.Thread(target=_timeline_rewrite_worker,args=(ACTIVE_CAMPAIGN_ID,),daemon=True,
+                     name='stellaris-timeline-rewrite').start()
+    return {'ok':True,'message':'Full historical reconstruction started. A consistent SQLite backup will be created before derived evidence is refreshed.'}
+
+
+@app.get('/api/rewrite-timeline/status')
+def api_rewrite_timeline_status():
+    with TIMELINE_REWRITE_LOCK:
+        return dict(TIMELINE_REWRITE_STATE)
+
+@app.get('/intelligence-history')
+def open_intelligence_history():
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, 'No campaign is active.')
+    from historian.civic_frontier import render_intelligence_history
+    try:
+        path = render_intelligence_history(DB, ACTIVE_CAMPAIGN_ID)
+    except Exception as exc:
+        error(f'INTELLIGENCE HISTORY - {exc}')
+        raise HTTPException(500, 'Intelligence history could not be rendered.') from exc
+    return FileResponse(path, media_type='text/html', headers={'Cache-Control':'no-store,max-age=0'})
+
+
+@app.get('/civic-frontier-history')
+def open_civic_frontier_history():
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, 'No campaign is active.')
+    try:
+        path=render_civic_frontier_history(DB,ACTIVE_CAMPAIGN_ID)
+    except Exception as exc:
+        error(f'CIVIC & FRONTIER HISTORY - {exc}')
+        raise HTTPException(500, 'Civic and Frontier History could not be rendered.') from exc
+    return FileResponse(path,media_type='text/html',headers={'Cache-Control':'no-store,max-age=0'})
+
+
+# v0.0.83.1 Snapshot-verified annual government census.
+# v0.0.84: read-only, local Imperial Situation Room. No timeline changes.
+@app.get('/imperial-dashboard')
+def open_imperial_dashboard(request: Request):
+    _require_local_request(request)
+    if ACTIVE_CAMPAIGN_ID is None:
+        return RedirectResponse('/campaign', status_code=307)
+    return FileResponse(BASE / 'static' / 'imperial_dashboard.html',
+                        media_type='text/html',headers={'Cache-Control':'no-store,max-age=0'})
+
+
+@app.get('/api/imperial-dashboard')
+def api_imperial_dashboard(request: Request, refresh: bool = False):
+    _require_local_request(request)
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, 'Select a campaign to view the Imperial Situation Room.')
+    try:
+        return JSONResponse(dashboard_data(DB.path, ACTIVE_CAMPAIGN_ID, force=refresh),
+                            headers={'Cache-Control':'no-store,max-age=0'})
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        error(f'IMPERIAL DASHBOARD - {exc}')
+        raise HTTPException(500, 'Dashboard could not read the campaign evidence.') from exc
+
+
+@app.get('/government-census')
+def open_government_census(request: Request):
+    _require_local_request(request)
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, 'Select an active campaign first.')
+    try:
+        output = render_annual_census(DB.path, ACTIVE_CAMPAIGN_ID)
+    except (ValueError, OSError, sqlite3.Error) as exc:
+        error(f'ANNUAL GOVERNMENT CENSUS - {exc}')
+        raise HTTPException(500, 'Annual census could not be rendered.') from exc
+    return HTMLResponse(output, headers={'Cache-Control':'no-store,max-age=0'})
+
+# v0.0.83 Government & People and protected read-only database explorer.
+@app.get('/government-people')
+def open_government_people(request: Request):
+    _require_local_request(request)
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, 'Select an active campaign first.')
+    try:
+        output = render_government_people(DB.path, ACTIVE_CAMPAIGN_ID)
+    except (ValueError, OSError, sqlite3.Error) as exc:
+        error(f'GOVERNMENT & PEOPLE - {exc}')
+        raise HTTPException(500, 'Government history is unavailable.') from exc
+    return HTMLResponse(output, headers={'Cache-Control':'no-store,max-age=0'})
+
+
+def _database_paths():
+    archive = None
+    if ACTIVE_CAMPAIGN_ID is not None:
+        campaign = DB.campaign(ACTIVE_CAMPAIGN_ID)
+        if campaign is not None:
+            archive = Path(campaign['archive_dir'])
+    return discover_local_databases(DB.path, archive)
+
+
+def _database_path(key: str) -> Path:
+    allowed = _database_paths()
+    if key not in allowed:
+        raise HTTPException(404,'Database is unavailable.')
+    return allowed[key]
+
+
+def _database_campaign_id(enabled: bool) -> int | None:
+    return ACTIVE_CAMPAIGN_ID if enabled else None
+
+
+@app.get('/database')
+def open_database_browser(request: Request):
+    _require_local_request(request)
+    return FileResponse(BASE/'static'/'database_explorer.html',media_type='text/html',
+                        headers={'Cache-Control':'no-store,max-age=0'})
+
+
+@app.get('/api/database/databases')
+def api_database_list(request: Request):
+    _require_local_request(request)
+    return {'databases': {k:{'label': {'historian':'Historian (main)',
+                                      'civic':'Civic & Frontier (campaign)',
+                                      'research':'Research (campaign)'}.get(k,k)}
+                          for k in _database_paths()},
+            'active_campaign_id': ACTIVE_CAMPAIGN_ID}
+
+
+@app.get('/api/database/tables')
+def api_database_tables(request: Request, database: str = 'historian', campaign_only: bool = True):
+    _require_local_request(request)
+    try:
+        return {'tables':available_tables(_database_path(database),_database_campaign_id(campaign_only))}
+    except (sqlite3.Error, ValueError, OSError) as exc:
+        raise HTTPException(400, f'Cannot list database tables: {exc}') from exc
+
+
+@app.get('/api/database/rows')
+def api_database_rows(request: Request, table: str, database: str='historian',
+                      campaign_only: bool=True, offset: int=0, limit: int=50, search: str=''):
+    _require_local_request(request)
+    try:
+        return table_rows(_database_path(database),table,campaign_id=_database_campaign_id(campaign_only),
+                          offset=offset,limit=limit,search=search)
+    except (sqlite3.Error,ValueError,OSError) as exc:
+        raise HTTPException(400, f'Cannot browse table: {exc}') from exc
+
+
+@app.get('/api/database/schema')
+def api_database_schema(request: Request, table: str, database: str='historian'):
+    _require_local_request(request)
+    try:
+        return read_database_schema(_database_path(database),table)
+    except (sqlite3.Error,ValueError,OSError) as exc:
+        raise HTTPException(400, f'Cannot read schema: {exc}') from exc
+
+
+@app.get('/api/database/export')
+def api_database_export(request: Request, table: str, database: str='historian', campaign_only: bool=True):
+    _require_local_request(request)
+    try:
+        content = csv_export(_database_path(database),table,_database_campaign_id(campaign_only))
+    except (sqlite3.Error,ValueError,OSError) as exc:
+        raise HTTPException(400, f'Cannot export table: {exc}') from exc
+    filename = re.sub(r'[^A-Za-z0-9_-]', '_', table) + '.csv'
+    return Response(content,media_type='text/csv; charset=utf-8',
+                    headers={'Content-Disposition':f'attachment; filename="{filename}"',
+                             'Cache-Control':'no-store,max-age=0'})
+
+
+@app.post('/api/database/select')
+async def api_database_select(request: Request):
+    _require_local_request(request)
+    # An external website cannot submit the local research console from another origin.
+    origin=request.headers.get('origin')
+    if origin and origin.rstrip('/') not in {'http://127.0.0.1:8766','http://localhost:8766','http://[::1]:8766'}:
+        raise HTTPException(403,'SQL console is restricted to Historian’s own origin.')
+    data=await request.json()
+    if not isinstance(data,dict) or not isinstance(data.get('query'),str):
+        raise HTTPException(400,'A SELECT query is required.')
+    try:
+        return select_query(_database_path(str(data.get('database','historian'))),data['query'])
+    except (sqlite3.Error,ValueError,OSError) as exc:
+        raise HTTPException(400, f'SELECT query rejected: {exc}') from exc
+
+
+@app.get("/research-history")
+def open_research_history():
+    if ACTIVE_CAMPAIGN_ID is None:
+        raise HTTPException(400, "No campaign is active.")
+    try:
+        path=render_research_history(DB,ACTIVE_CAMPAIGN_ID)
+    except Exception as exc:
+        error(f"RESEARCH HISTORY - {exc}")
+        raise HTTPException(500, "Research History could not be rendered.") from exc
+    return FileResponse(path, media_type="text/html", headers={"Cache-Control":"no-store, max-age=0"})
 
 
 @app.get("/timeline")

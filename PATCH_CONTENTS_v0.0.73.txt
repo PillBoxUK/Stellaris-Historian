@@ -1,0 +1,35 @@
+STELLARIS HISTORIAN v0.0.73 - INTERACTIVE EMPIRE TIMELINE
+CLASSIC PATCH - APPLICATION FILES AT ZIP ROOT
+
+Install: Stop Live History and close Historian. Back up the application files
+being replaced. Extract the ZIP contents directly over your existing
+G:\codex\StellarisHistorian installation. Restart with the original start.bat.
+Do NOT delete or replace the data/ directory, saved .sav archives, SQLite DB,
+.historian_cache, logs, or configuration. None are included in this ZIP.
+
+New:
+ - /interactive-timeline and dashboard Timeline button
+ - Drag recorded-date slider; next / previous / start / latest / play / pause
+ - Clickable year activity histogram and date-jump box
+ - Search and filter events, including colonies, fleet/space engagements,
+   technology, First Contacts, government, internal council, diplomacy,
+   fleet and people histories.
+ - Explicit ground, Federation and Galactic Community categories which do
+   NOT invent missing data when no save-derived events are retained.
+ - Click an event to inspect narrative, provenance, source date kind,
+   confidence, and links to existing views.
+ - Optional unpublished technical observations, locally filtered JSON export.
+ - Printable classic timeline remains at /timeline.
+
+How it works:
+ - Reuses existing SQLite history, existing reviewed presentation caches,
+   and the First Contact derived JSON; no raw save reparse or migrations.
+ - Evidence certainty and first-observed caveats are retained.
+ - On demand, only when the campaign is fully processed.
+ - The slider steps across dates with recorded events, not real-time game days.
+
+IMPORTANT: This is a new reader and UI, NOT a completed new parser for
+Federation votes, Galactic Community resolutions or undocumented ground
+combat. These remain future evidence-decoding milestones.
+
+No GitHub push was performed. Restart REQUIRED after copying.

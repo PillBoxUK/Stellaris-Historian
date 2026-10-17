@@ -64,6 +64,24 @@ def _float_scalar(text: str | None, key: str) -> float | None:
         return None
 
 
+def _war_direct_float(record: str, key: str) -> float | None:
+    """Read ONLY a war's direct key, not an identically named battle child.
+
+    The observed game format places war scalar children at exactly two tabs
+    inside the numeric war. Never search every nested line for this metric.
+    """
+    # Determine the direct-child indentation from its native start_date.
+    anchor = re.search(r'(?m)^([ \t]*)start_date\s*=',record)
+    if anchor is None:return None
+    indent=anchor.group(1)
+    row=re.search(rf'(?m)^{re.escape(indent)}{re.escape(key)}\s*=\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*$',record)
+    if not row:return None
+    try:
+        value=float(row.group(1))
+        return value if 0 <= value <= 1.000001 else None
+    except ValueError:return None
+
+
 def _yes_no(text: str | None, key: str) -> bool | None:
     value = _scalar(text, key)
     if value == "yes":
@@ -819,11 +837,10 @@ def extract_combat_snapshot(
             defender_country_ids=defenders,
             attacker_war_goal=_goal_name(record, "attacker_war_goal"),
             defender_war_goal=_goal_name(record, "defender_war_goal"),
-            # The documented exhaustion keys occur inside individual battle
-            # records in the sampled Stellaris save, not as current war-wide
-            # totals. Never read a nested battle field as a war-level metric.
-            attacker_war_exhaustion=None,
-            defender_war_exhaustion=None,
+            # True direct-child fields; never absorb identically named battle
+            # children. Keep raw fractions without assuming game UI scaling.
+            attacker_war_exhaustion=_war_direct_float(record,'attacker_war_exhaustion'),
+            defender_war_exhaustion=_war_direct_float(record,'defender_war_exhaustion'),
             battles=war_battles,
         )
         wars[war_id] = state

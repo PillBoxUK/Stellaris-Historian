@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#08111d"><title>Imperial Situation Room — Stellaris Historian</title>
+<link rel="stylesheet" href="/static/imperial_dashboard.css?v=084">
+<script src="/static/imperial_dashboard.js?v=084" defer></script>
+
+<link rel="stylesheet" href="/static/historian-theme.css?v=087">
+<script src="/static/historian-theme.js?v=087"></script>
+</head>
+<body>
+<div class="backdrop" aria-hidden="true"></div>
+<header class="mast">
+  <div class="mast-top"><a class="brand" href="/campaign"><span class="logo">✦</span><span><strong>STELLARIS HISTORIAN</strong><small>IMPERIAL SITUATION ROOM <em>v0.0.84</em></small></span></a>
+  <nav aria-label="Historical navigation"><a href="/campaign">Campaign</a><a href="/timeline">Imperial Annals</a><a href="/government-census">Annual Census</a><a href="/government-people">Government & People</a><a href="/database">Database Explorer</a></nav></div>
+  <div class="hero"><div><p class="eyebrow"><span class="pulse"></span> LIVE ARCHIVE INTELLIGENCE · READ-ONLY</p><h1 id="empire">Imperial Situation Room</h1><p class="intro">A strategic overview of your civilisation, reconstructed from archived Ironman evidence.</p></div>
+  <div class="date-box"><small>LATEST PROCESSED SAVE</small><strong id="current-date">—</strong><span id="updated">Connecting to historical records…</span><button type="button" id="refresh" title="Refresh from saved historical evidence">↻ Refresh data</button></div></div>
+</header>
+<main>
+<div id="error" class="error" role="alert" hidden></div>
+<div class="section-head"><div><p class="eyebrow">STRATEGIC READOUT</p><h2>Empire at a glance</h2></div><span id="health" class="health">Awaiting evidence</span></div>
+<div class="metric-grid" id="metrics" aria-label="Current state indicators">
+ <div class="metric skeleton"></div><div class="metric skeleton"></div><div class="metric skeleton"></div><div class="metric skeleton"></div><div class="metric skeleton"></div><div class="metric skeleton"></div><div class="metric skeleton"></div><div class="metric skeleton"></div>
+</div>
+<div class="toolbar"><div class="time-controls" role="group" aria-label="Chart date range"><button data-range="10" type="button">10Y</button><button data-range="25" type="button">25Y</button><button data-range="50" type="button">50Y</button><button data-range="all" class="on" type="button">ALL YEARS</button></div><div class="coverage" id="coverage">Loading historical coverage…</div></div>
+<div class="section-head"><div><p class="eyebrow">THE LONG VIEW</p><h2>Empire history in numbers</h2></div><span class="section-context">Timeline charts, not the historical narrative</span></div>
+<section class="viz-grid" aria-label="Historical trend charts">
+  <article class="panel chart-panel population"><div class="panel-head"><div><div class="supertitle">01 / DEMOGRAPHY</div><h3>Population growth</h3><p>World-population values recorded in archived states</p></div><span class="panel-symbol">◉</span></div><div class="chart" data-chart="population" role="img" aria-label="Population values by archive date"></div><p class="chart-note">Stellaris stored population units · no assumed scale conversion</p></article>
+  <article class="panel chart-panel"><div class="panel-head"><div><div class="supertitle">02 / FRONTIER</div><h3>Expansion of the realm</h3><p>Controlled systems, known systems and colonies</p></div><span class="panel-symbol">⌖</span></div><div class="chart" data-chart="expansion" role="img" aria-label="Expansion by archive date"></div><p class="chart-note">Control counts require player-owned starbase evidence</p></article>
+  <article class="panel chart-panel"><div class="panel-head"><div><div class="supertitle">03 / RESEARCH</div><h3>Scientific development</h3><p>Total researched technologies across saved states</p></div><span class="panel-symbol">⚛</span></div><div class="chart" data-chart="science" role="img" aria-label="Researched technologies by archive date"></div><p class="chart-note">Distinct researched-technology keys recorded in each save; this is not research speed</p></article>
+  <article class="panel chart-panel"><div class="panel-head"><div><div class="supertitle">04 / FLEET OPERATIONS</div><h3>Strength in space</h3><p>Recorded ships and fleets over time</p></div><span class="panel-symbol">⋈</span></div><div class="chart" data-chart="military" role="img" aria-label="Fleet and ship counts by archive date"></div><p class="chart-note">Fleet records may include non-military classes; these are inventory counts, not fleet power</p></article>
+  <article class="panel chart-panel"><div class="panel-head"><div><div class="supertitle">05 / INDUSTRIAL FRONTIER</div><h3>Orbital infrastructure</h3><p>Mining, research and starbase installations across the years</p></div><span class="panel-symbol">▣</span></div><div class="chart" data-chart="infrastructure" role="img" aria-label="Mining research and starbase installations by archive date"></div><p class="chart-note">Station inventories require source-verified Civic & Frontier observations</p></article>
+  <article class="panel chart-panel"><div class="panel-head"><div><div class="supertitle">06 / CIVIL SERVICE</div><h3>Leadership roster</h3><p>Active recorded leaders through the campaign</p></div><span class="panel-symbol">♛</span></div><div class="chart" data-chart="leadership" role="img" aria-label="Active leader count by archive date"></div><p class="chart-note">Total active leader objects; career histories are available in Government & People</p></article>
+</section>
+<section class="lower-grid">
+ <article class="panel world-panel"><div class="panel-head"><div><div class="supertitle">07 / COLONIAL ADMINISTRATION</div><h3>Most populous worlds</h3><p>Latest processed world's raw saved population values</p></div><a href="/empire-archive">View archive ↗</a></div><div id="worlds" class="world-list"><p class="muted">Waiting for population evidence…</p></div></article>
+ <article class="panel gov-panel"><div class="panel-head"><div><div class="supertitle">08 / STATE LEADERSHIP</div><h3>The government in office</h3><p>Leadership on the last processed archive date</p></div><a href="/government-census">View census ↗</a></div><div id="government" class="gov-content"><p class="muted">Waiting for government evidence…</p></div></article>
+</section>
+<section class="panel activity-panel" id="activity">
+ <div class="panel-head"><div><div class="supertitle">09 / INTELLIGENCE FEED</div><h3>Recent historical developments</h3><p>Dated events gathered from the historian's existing evidence tables</p></div><a href="/timeline">Read the Imperial Annals ↗</a></div>
+ <div class="feed-tools"><label for="event-filter">Domain <select id="event-filter"><option value="all">All developments</option><option value="politics">Government & diplomacy</option><option value="people">People & careers</option><option value="worlds">Colonies & worlds</option><option value="military">Ships & fleets</option></select></label><label for="event-period">Period <select id="event-period"><option value="all">Recent recorded events</option><option value="5">Past 5 years</option><option value="10">Past 10 years</option><option value="25">Past 25 years</option></select></label><input id="event-search" type="search" placeholder="Search dated events, names or places" aria-label="Search historical events"></div>
+ <div id="event-list" class="event-list"><p class="muted">Waiting for historical entries…</p></div>
+</section>
+<footer><div><strong>THE IMPERIAL ANNALS REMAIN THE HISTORY BOOK.</strong><p>This is an analytical companion. Save-derived evidence may have gaps; observations are not necessarily exact event dates.</p></div><div id="source-note">Historian · local-only · read-only</div></footer>
+</main>
+</body>
+</html>
